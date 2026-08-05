@@ -9,3 +9,5 @@ Por ahora tiene un titulo provisional mientras decidimos cual sera el proyecto d
 - Repositorio de prueba
 - Nombre provisional
 - Proyecto pendiente por definir
+- bendiciones 
+- Status
