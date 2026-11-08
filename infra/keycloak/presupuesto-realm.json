@@ -1,0 +1,77 @@
+{
+  "id": "presupuesto-realm",
+  "realm": "presupuesto-realm",
+  "enabled": true,
+  "displayName": "Presupuestador de Obra - UCEVA",
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "presupuestador",
+        "description": "Crea y edita presupuestos y mantiene el catalogo de insumos con sus precios."
+      },
+      {
+        "name": "revisor",
+        "description": "Consulta presupuestos y los aprueba. Un presupuesto aprobado deja de ser editable."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "presupuesto-frontend",
+      "name": "Frontend Angular Presupuestador (Public PKCE)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "presupuestador1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Andres",
+      "lastName": "Presupuestador",
+      "email": "presupuestador1@uceva.edu.co",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "presupuestador123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "presupuestador"
+      ]
+    },
+    {
+      "username": "revisor1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Esteban",
+      "lastName": "Revisor",
+      "email": "revisor1@uceva.edu.co",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "revisor123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "revisor"
+      ]
+    }
+  ]
+}

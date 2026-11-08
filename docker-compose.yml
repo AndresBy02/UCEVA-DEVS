@@ -1,0 +1,74 @@
+# ==============================================================================
+# Manifiesto de Orquestacion Completo - Presupuestador de Obra (UCEVA Devs)
+# Compatible con Docker Compose y Docker Swarm (incluye limites explicitos de CPU y RAM)
+# ==============================================================================
+services:
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: presupuesto-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-uceva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uceva_secret_2026}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init-multiple-dbs.sql:/docker-entrypoint-initdb.d/init-multiple-dbs.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uceva"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: presupuesto-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/keycloak/presupuesto-realm.json:/opt/keycloak/data/import/presupuesto-realm.json:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+
+  calculo-service:
+    build:
+      context: .
+      dockerfile: services/calculo-service/Dockerfile
+    image: uceva/calculo-service:sprint1
+    container_name: presupuesto-calculo-service
+    environment:
+      SERVER_PORT: 8083
+      CALCULO_FINANZAS_MODO: NATIVE
+    ports:
+      - "8083:8083"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+volumes:
+  postgres_data:
