@@ -1,0 +1,25 @@
+# Compilados Java y Maven
+target/
+*.jar
+*.war
+*.class
+
+# Binarios nativos locales
+*.so
+*.dll
+*.dylib
+*.o
+native-lib/test_finanzas
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Entornos e IDEs
+.env
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: calculo-service
+
+calculo:
+  finanzas:
+    # AUTO: usa libfinanzas.so si esta en LD_LIBRARY_PATH / jna.library.path, o Java fallback en desarrollo local
+    # NATIVE: exige obligatoriamente libfinanzas.so (modo produccion en contenedor)
+    # JAVA: fuerza la linea base en Java puro
+    modo: ${CALCULO_FINANZAS_MODO:AUTO}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
