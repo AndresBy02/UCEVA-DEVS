@@ -1,0 +1,21 @@
+{
+  "total_items": 200,
+  "regla_redondeo": "RoundingMode.HALF_UP a 2 decimales en cada valor_parcial = ROUND(cantidad * precio_unitario, 2)",
+  "subtotales_capitulo": {
+    "CAP-01": "891086.71",
+    "CAP-02": "1055433.36",
+    "CAP-03": "1236102.03",
+    "CAP-04": "879509.60",
+    "CAP-05": "1149302.01"
+  },
+  "costo_directo": "5211433.71",
+  "porcentaje_administracion": "8.00",
+  "valor_administracion": "416914.70",
+  "porcentaje_imprevistos": "3.00",
+  "valor_imprevistos": "156343.01",
+  "porcentaje_utilidad": "5.00",
+  "valor_utilidad": "260571.69",
+  "precio_venta": "6045263.11",
+  "margen_sobre_costo_porcentaje": "16.00",
+  "margen_sobre_precio_venta_porcentaje": "13.79"
+}
