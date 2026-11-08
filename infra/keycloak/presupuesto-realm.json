@@ -43,7 +43,7 @@
       "emailVerified": true,
       "firstName": "Andres",
       "lastName": "Presupuestador",
-      "email": "presupuestador1@uceva.edu.co",
+      "email": "presupuestador1@example.com",
       "credentials": [
         {
           "type": "password",
@@ -61,7 +61,7 @@
       "emailVerified": true,
       "firstName": "Esteban",
       "lastName": "Revisor",
-      "email": "revisor1@uceva.edu.co",
+      "email": "revisor1@example.com",
       "credentials": [
         {
           "type": "password",
