@@ -62,6 +62,8 @@ flowchart LR
   - `insumos`: `id` (UUID), `codigo` (único, ej. `CEM-001`), `descripcion`, `unidad_medida` (enum cerrado: `M`, `M2`, `M3`, `KG`, `BULTO`, `UNIDAD`, `DIA`), `precio_unitario` (`NUMERIC(19,3)`), `activo`, `updated_at`, `updated_by` (claim `sub` del JWT).
   - `historial_precios_insumo`: registro inmutable de cada cambio de precio con fecha y autor.
 - **Lo que NO sabe:** No conoce qué es un presupuesto, un capítulo, una cantidad de obra ni el AIU. No lleva existencias de bodega ni movimientos de inventario.
+- **Interfaces HU-02:** `GET /api/insumos` lista el catálogo y acepta el filtro opcional `activo`; `GET /api/insumos/{id}` devuelve detalle, historial de precios y presupuestos; `GET /api/insumos/{id}/historial` devuelve los cambios más recientes primero; `PUT /api/insumos/{id}` edita descripción, unidad, precio y estado, manteniendo inmutable el código. La consulta de presupuestos se delega a `presupuesto-service` (`GET /api/v1/presupuestos?insumoId={id}`), sin consultar directamente su base de datos.
+- **Historial:** El precio vigente y su registro de cambio se guardan en la misma transacción de `insumo-service`. Un PUT con el mismo precio no agrega una entrada; los presupuestos conservan su `precio_unitario_copia`.
 
 ### 3.2. `presupuesto-service` (Puerto `8082`)
 - **Responsabilidad única:** Gestionar el ciclo de vida de los presupuestos, su estructura por capítulos e ítems, la inmutabilidad del precio cotizado, la comparación de escenarios, el versionado (snapshots enviados al cliente) y el estado de aprobación (`BORRADOR`, `APROBADO`).
@@ -72,6 +74,7 @@ flowchart LR
   - `versiones_presupuesto`: snapshot JSON/relacional inmutable cuando el presupuesto se marca como enviado al cliente (RF-10).
 - **Decisión clave de frontera (Copia vs. Referencia):** Al agregar un ítem al presupuesto, `presupuesto-service` consulta a `insumo-service` **una sola vez** y **copia** el `precio_unitario` vigente en `precio_unitario_copia`. Si el día de mañana sube el cemento en `insumo-service`, los presupuestos existentes conservan intacto su valor esperado. Solo una acción explícita del usuario (`POST /api/v1/presupuestos/{id}/sincronizar-precios`) actualiza los precios contra el catálogo vigente (permitido únicamente en estado `BORRADOR`).
 - **Delegación de cálculos:** `presupuesto-service` no ejecuta fórmulas financieras ni redondeos por su cuenta; invoca a `calculo-service` enviando los ítems y parámetros para obtener los subtotales, AIU, márgenes, punto de equilibrio y evaluación financiera.
+- **Consulta HU-02:** `GET /api/v1/presupuestos?insumoId={id}` devuelve los presupuestos con ítems que referencian el insumo, para que el catálogo pueda mostrar su uso sin acoplarse a `presupuesto_db`.
 
 ### 3.3. `calculo-service` (Puerto `8083`)
 - **Responsabilidad única:** Motor determinista de cálculo presupuestal (en `BigDecimal` con `RoundingMode.HALF_UP`) y puente exclusivo hacia la biblioteca nativa `libfinanzas.so` mediante JNA (con respaldo configurable en Java puro).
@@ -103,8 +106,8 @@ flowchart LR
 
 | Servicio | Operación / Endpoint | `presupuestador` | `revisor` | Sin Autenticar |
 | :--- | :--- | :---: | :---: | :---: |
-| `insumo-service` | `POST /api/v1/insumos` · `PUT /api/v1/insumos/{id}` (Crear/actualizar insumo y precio) | **200 / 201** | **403** | **401** |
-| `insumo-service` | `GET /api/v1/insumos/**` (Consultar catálogo) | **200** | **200** | **401** |
+| `insumo-service` | `PUT /api/insumos/{id}` (Actualizar datos editables y precio) | **200** | **403** | **401** |
+| `insumo-service` | `GET /api/insumos`, `GET /api/insumos/{id}`, `GET /api/insumos/{id}/historial` (Consultar catálogo, detalle e historial) | **200** | **200** | **401** |
 | `presupuesto-service` | `POST /api/v1/presupuestos` · `PUT /api/v1/presupuestos/{id}/**` (Crear o editar presupuesto en `BORRADOR`) | **200 / 201** | **403** | **401** |
 | `presupuesto-service` | `GET /api/v1/presupuestos/**` (Consultar presupuesto, versiones y su total) | **200** | **200** | **401** |
 | `presupuesto-service` | `POST /api/v1/presupuestos/{id}/aprobar` (Aprobar un presupuesto) | **403** | **200** | **401** |
