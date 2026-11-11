@@ -50,6 +50,49 @@ services:
           cpus: "0.50"
           memory: 512M
 
+  presupuesto-service:
+    build:
+      context: .
+      dockerfile: services/presupuesto-service/Dockerfile
+    image: uceva/presupuesto-service:sprint1
+    container_name: presupuesto-presupuesto-service
+    environment:
+      SERVER_PORT: 8082
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/presupuesto_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-uceva}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-uceva_secret_2026}
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/presupuesto-realm
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/presupuesto-realm/protocol/openid-connect/certs
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+  insumo-service:
+    build:
+      context: .
+      dockerfile: services/insumo-service/Dockerfile
+    image: uceva/insumo-service:sprint1
+    container_name: presupuesto-insumo-service
+    environment:
+      SERVER_PORT: 8081
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/insumo_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-uceva}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-uceva_secret_2026}
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/presupuesto-realm
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/presupuesto-realm/protocol/openid-connect/certs
+      PRESUPUESTO_SERVICE_URL: http://presupuesto-service:8082
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      presupuesto-service:
+        condition: service_started
+    ports:
+      - "8081:8081"
+
   calculo-service:
     build:
       context: .
