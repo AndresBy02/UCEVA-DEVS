@@ -1,0 +1,41 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: insumo-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/insumo_db
+    username: ${POSTGRES_USER:uceva}
+    password: ${POSTGRES_PASSWORD:uceva_secret_2026}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # La base de datos es la fuente de verdad: el esquema se crea con el script
+    # de inicializacion de Postgres (infra/postgres/init-multiple-dbs.sql) y
+    # Hibernate solo valida que las entidades coincidan.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/presupuesto-realm}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # Expone el estado de cada componente (db, diskSpace, ping) para los
+      # healthchecks de Docker sin revelar detalles sensibles de conexion.
+      show-components: always
