@@ -54,16 +54,16 @@ docker compose up -d --build
 ```
 > **¿Qué hace este comando automáticamente?**
 > 1. Compila en Linux la biblioteca en C `native-lib/finanzas.c` $\to$ `libfinanzas.so` y ejecuta la suite de pruebas en C (`make test`).
-> 2. Compila `calculo-service` con Maven y arma una imagen ligera solo con el JRE 21 + `libfinanzas.so` + el JAR.
+> 2. Compila `insumo-service`, `presupuesto-service` y `calculo-service` y levanta los tres servicios en los puertos `8081`, `8082` y `8083`.
 > 3. Levanta **PostgreSQL 16** en el puerto `5432` y ejecuta `infra/postgres/init-multiple-dbs.sql`, creando automáticamente las bases de datos `insumo_db` y `presupuesto_db` con columnas `NUMERIC(19,3)` y `NUMERIC(19,2)`.
 > 4. Levanta **Keycloak 26** en el puerto `8080` e importa automáticamente el realm `presupuesto-realm` (`infra/keycloak/presupuesto-realm.json`) con los roles y usuarios de prueba listos.
-> 5. Levanta **`calculo-service`** en el puerto `8083` conectado a `libfinanzas.so` vía JNA.
+> 5. Levanta **`insumo-service`** y **`presupuesto-service`** conectados a sus bases independientes, además de **`calculo-service`** en el puerto `8083` conectado a `libfinanzas.so` vía JNA.
 
 ### Paso 3: Verificar que los contenedores están corriendo
 ```bash
 docker compose ps
 ```
-Deberías ver `presupuesto-postgres`, `presupuesto-keycloak` y `presupuesto-calculo-service` en estado `Up`.
+Deberías ver `presupuesto-postgres`, `presupuesto-keycloak`, `presupuesto-insumo-service`, `presupuesto-presupuesto-service` y `presupuesto-calculo-service` en estado `Up`.
 
 ---
 
@@ -114,6 +114,50 @@ docker compose down
 ```
 *(Si deseas borrar también los volúmenes de la base de datos para reiniciar desde cero: `docker compose down -v`).*
 
+### 3.5. Consultar y editar el catálogo de insumos (HU-02)
+Los endpoints requieren un JWT válido del realm `presupuesto-realm`. Los roles `presupuestador` y `revisor` pueden consultar; solo `presupuestador` puede editar. El código del insumo es inmutable. El precio usa `BigDecimal`/`NUMERIC(19,3)`: se rechazan precios negativos o con más de tres decimales. Cada cambio de precio se registra junto con el anterior en la misma transacción; editar otros campos o enviar el mismo precio no genera historial. El catálogo no administra existencias.
+
+En **PowerShell**, obtiene un token de desarrollo, reemplaza `$id` por un UUID existente y consulta el catálogo/detalle/historial:
+```powershell
+$tokenResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/realms/presupuesto-realm/protocol/openid-connect/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body @{ client_id = "presupuesto-frontend"; grant_type = "password"; username = "presupuestador1"; password = "presupuestador123" }
+$token = $tokenResponse.access_token
+$headers = @{ Authorization = ('Bearer' + [char]32 + $token) }
+Invoke-RestMethod -Uri "http://localhost:8081/api/insumos" -Headers $headers
+Invoke-RestMethod -Uri "http://localhost:8081/api/insumos/$id" -Headers $headers
+Invoke-RestMethod -Uri "http://localhost:8081/api/insumos/$id/historial" -Headers $headers
+```
+
+La edición conserva el precio vigente y agrega el historial si el precio cambió:
+```powershell
+$body = '{"descripcion":"Cemento gris","unidadMedida":"BULTO","precioUnitario":34500.000,"activo":true}'
+Invoke-RestMethod -Method Put -Uri "http://localhost:8081/api/insumos/$id" `
+  -Headers $headers -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 6
+```
+
+La respuesta del PUT/detalle incluye `precioUnitario`, `historialPrecios` (más reciente primero) y `presupuestos`. Por ejemplo:
+```json
+{
+  "codigo": "CEM-001",
+  "precioUnitario": 34500.000,
+  "historialPrecios": [
+    { "precioAnterior": 33000.000, "precioNuevo": 34500.000, "modificadoPor": "presupuestador1 (sub)", "fechaCambio": "2026-11-11T15:00:00Z" }
+  ],
+  "presupuestos": [
+    { "id": "uuid", "codigo": "PRE-001", "nombre": "Ampliación", "estado": "BORRADOR" }
+  ]
+}
+```
+
+Sin autenticación se responde `401`; un `revisor` que intenta editar recibe `403`; un insumo inexistente responde `404`; datos no válidos responden `400`; si `presupuesto-service` no está disponible, el detalle o la respuesta del PUT devuelve `502` en lugar de omitir asociaciones. Ejecuta las pruebas de integración PostgreSQL 16 con Docker activo:
+```powershell
+mvn -f services/insumo-service/pom.xml clean test
+mvn -f services/presupuesto-service/pom.xml clean test
+```
+Para desarrollo local activa `SPRING_PROFILES_ACTIVE=local` y establece `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` y `SPRING_DATASOURCE_PASSWORD`. Docker Compose usa el perfil `docker`; las contraseñas se proporcionan mediante variables de entorno.
+
 ---
 
 ## 4. Accesos, Puertos y Credenciales de Desarrollo
@@ -124,8 +168,8 @@ docker compose down
 | **Keycloak Realm (`presupuesto-realm`)** | Rol `presupuestador` | Usuario: `presupuestador1` · Contraseña: `presupuestador123` |
 | **Keycloak Realm (`presupuesto-realm`)** | Rol `revisor` | Usuario: `revisor1` · Contraseña: `revisor123` |
 | **PostgreSQL (`insumo_db` y `presupuesto_db`)** | `localhost:5432` | Usuario: `uceva` · Contraseña: `uceva_secret_2026` |
-| **`insumo-service`** *(Catálogo)* | `http://localhost:8081` | Esqueleto base en `services/insumo-service/` |
-| **`presupuesto-service`** *(Presupuestos)* | `http://localhost:8082` | Esqueleto base en `services/presupuesto-service/` |
+| **`insumo-service`** *(Catálogo)* | `http://localhost:8081` | `GET /api/insumos`, `GET /api/insumos/{id}`, `GET /api/insumos/{id}/historial`, `PUT /api/insumos/{id}` |
+| **`presupuesto-service`** *(Presupuestos)* | `http://localhost:8082` | Consulta interna `GET /api/v1/presupuestos?insumoId={id}` |
 | **`calculo-service`** *(Motor Exacto + JNA)* | `http://localhost:8083` | Activo en Docker (`GET /api/v1/calculos/spike-jna`) |
 
 ---
