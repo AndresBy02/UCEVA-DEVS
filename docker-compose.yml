@@ -70,5 +70,32 @@ services:
           cpus: "0.25"
           memory: 256M
 
+  # Catalogo maestro de insumos y precios unitarios exactos (NUMERIC 19,3)
+  insumo-service:
+    build:
+      context: .
+      dockerfile: services/insumo-service/Dockerfile
+    image: uceva/insumo-service:sprint1
+    container_name: presupuesto-insumo-service
+    environment:
+      SERVER_PORT: 8081
+      POSTGRES_HOST: postgres-db
+      POSTGRES_USER: ${POSTGRES_USER:-uceva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uceva_secret_2026}
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/presupuesto-realm
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
 volumes:
   postgres_data:
