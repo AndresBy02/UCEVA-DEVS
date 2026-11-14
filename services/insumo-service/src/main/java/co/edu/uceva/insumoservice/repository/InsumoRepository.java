@@ -9,9 +9,18 @@ import java.util.UUID;
 /**
  * Repositorio JPA del catalogo de insumos.
  *
- * <p>Sin consultas adicionales por ahora: la capa de API se incorpora en la
- * siguiente historia (UC-18).</p>
+ * <p>Ademas de las operaciones CRUD heredadas de {@link JpaRepository}, expone
+ * la verificacion de unicidad del codigo usada por la capa de servicio al
+ * crear un insumo.</p>
  */
 @Repository
 public interface InsumoRepository extends JpaRepository<Insumo, UUID> {
+
+    /**
+     * Indica si ya existe un insumo con el codigo indicado.
+     *
+     * @param codigo codigo unico del insumo
+     * @return {@code true} si el codigo ya esta registrado
+     */
+    boolean existsByCodigo(String codigo);
 }
