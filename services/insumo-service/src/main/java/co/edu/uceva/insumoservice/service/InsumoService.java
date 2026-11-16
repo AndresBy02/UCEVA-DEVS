@@ -5,8 +5,11 @@ import co.edu.uceva.insumoservice.domain.CodigoDuplicadoException;
 import co.edu.uceva.insumoservice.domain.InsumoNoEncontradoException;
 import co.edu.uceva.insumoservice.domain.UnidadMedida;
 import co.edu.uceva.insumoservice.domain.UnidadMedidaParser;
+import co.edu.uceva.insumoservice.model.HistorialPrecioInsumo;
 import co.edu.uceva.insumoservice.model.Insumo;
+import co.edu.uceva.insumoservice.repository.HistorialPrecioInsumoRepository;
 import co.edu.uceva.insumoservice.repository.InsumoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,22 +36,26 @@ public class InsumoService {
     private static final int ESCALA_PRECIO = 3;
 
     private final InsumoRepository insumoRepository;
+    private final HistorialPrecioInsumoRepository historialRepository;
 
     public InsumoService(InsumoRepository insumoRepository) {
-        this.insumoRepository = insumoRepository;
+        this(insumoRepository, null);
     }
 
-    /**
-     * Registra un nuevo insumo en el catalogo.
-     *
-     * @param request datos validados de entrada
-     * @return la entidad persistida
-     * @throws CodigoDuplicadoException      si ya existe un insumo con ese codigo
-     * @throws co.edu.uceva.insumoservice.domain.UnidadMedidaInvalidaException
-     *                                       si la unidad de medida no es valida
-     */
+    @Autowired
+    public InsumoService(InsumoRepository insumoRepository,
+                         HistorialPrecioInsumoRepository historialRepository) {
+        this.insumoRepository = insumoRepository;
+        this.historialRepository = historialRepository;
+    }
+
     @Transactional
     public Insumo crear(InsumoRequest request) {
+        return crear(request, null);
+    }
+
+    @Transactional
+    public Insumo crear(InsumoRequest request, String usuarioSub) {
         String codigo = request.getCodigo().trim();
         if (insumoRepository.existsByCodigo(codigo)) {
             throw new CodigoDuplicadoException(codigo);
@@ -55,6 +63,7 @@ public class InsumoService {
 
         UnidadMedida unidadMedida = UnidadMedidaParser.parse(request.getUnidadMedida());
         BigDecimal precioUnitario = normalizarPrecio(request.getPrecioUnitario());
+        OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
 
         Insumo insumo = new Insumo();
         insumo.setCodigo(codigo);
@@ -62,9 +71,62 @@ public class InsumoService {
         insumo.setUnidadMedida(unidadMedida);
         insumo.setPrecioUnitario(precioUnitario);
         insumo.setActivo(true);
-        insumo.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        insumo.setUpdatedBy(usuarioSub);
+        insumo.setUpdatedAt(ahora);
 
-        return insumoRepository.save(insumo);
+        Insumo guardado = insumoRepository.save(insumo);
+        if (historialRepository != null && guardado.getId() != null) {
+            registrarCambioPrecio(guardado.getId(), null, precioUnitario, usuarioSub, ahora);
+        }
+        return guardado;
+    }
+
+    @Transactional
+    public Insumo actualizar(UUID id, InsumoRequest request, String usuarioSub) {
+        Insumo insumo = obtenerPorId(id);
+        String codigo = request.getCodigo().trim();
+        if (insumoRepository.existsByCodigoAndIdNot(codigo, id)) {
+            throw new CodigoDuplicadoException(codigo);
+        }
+
+        UnidadMedida unidadMedida = UnidadMedidaParser.parse(request.getUnidadMedida());
+        BigDecimal precioAnterior = insumo.getPrecioUnitario();
+        BigDecimal precioNuevo = normalizarPrecio(request.getPrecioUnitario());
+        OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
+
+        insumo.setCodigo(codigo);
+        insumo.setDescripcion(request.getDescripcion().trim());
+        insumo.setUnidadMedida(unidadMedida);
+        insumo.setPrecioUnitario(precioNuevo);
+        insumo.setUpdatedBy(usuarioSub);
+        insumo.setUpdatedAt(ahora);
+
+        Insumo actualizado = insumoRepository.save(insumo);
+        if (historialRepository != null
+                && (precioAnterior == null || precioAnterior.compareTo(precioNuevo) != 0)) {
+            registrarCambioPrecio(actualizado.getId(), precioAnterior, precioNuevo, usuarioSub, ahora);
+        }
+        return actualizado;
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistorialPrecioInsumo> obtenerHistorialPrecios(UUID id) {
+        obtenerPorId(id);
+        return historialRepository != null
+                ? historialRepository.findByInsumoIdOrderByFechaCambioDesc(id)
+                : List.of();
+    }
+
+    private void registrarCambioPrecio(UUID insumoId, BigDecimal precioAnterior,
+                                       BigDecimal precioNuevo, String modificadoPor,
+                                       OffsetDateTime fechaCambio) {
+        HistorialPrecioInsumo historial = new HistorialPrecioInsumo();
+        historial.setInsumoId(insumoId);
+        historial.setPrecioAnterior(precioAnterior);
+        historial.setPrecioNuevo(precioNuevo);
+        historial.setModificadoPor(modificadoPor);
+        historial.setFechaCambio(fechaCambio);
+        historialRepository.save(historial);
     }
 
     /**

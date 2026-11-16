@@ -27,7 +27,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/presupuesto-realm}
+          jwk-set-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/presupuesto-realm}/protocol/openid-connect/certs
 
 management:
   endpoints:

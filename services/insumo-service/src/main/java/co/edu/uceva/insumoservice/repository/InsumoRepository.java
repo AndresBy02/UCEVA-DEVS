@@ -23,4 +23,6 @@ public interface InsumoRepository extends JpaRepository<Insumo, UUID> {
      * @return {@code true} si el codigo ya esta registrado
      */
     boolean existsByCodigo(String codigo);
+
+    boolean existsByCodigoAndIdNot(String codigo, UUID id);
 }

@@ -27,6 +27,7 @@ public class InsumoResponse {
     private BigDecimal precioUnitario;
 
     private boolean activo;
+    private String updatedBy;
     private OffsetDateTime updatedAt;
 
     public InsumoResponse() {
@@ -35,12 +36,18 @@ public class InsumoResponse {
 
     public InsumoResponse(UUID id, String codigo, String descripcion, String unidadMedida,
                           BigDecimal precioUnitario, boolean activo, OffsetDateTime updatedAt) {
+        this(id, codigo, descripcion, unidadMedida, precioUnitario, activo, null, updatedAt);
+    }
+
+    public InsumoResponse(UUID id, String codigo, String descripcion, String unidadMedida,
+                          BigDecimal precioUnitario, boolean activo, String updatedBy, OffsetDateTime updatedAt) {
         this.id = id;
         this.codigo = codigo;
         this.descripcion = descripcion;
         this.unidadMedida = unidadMedida;
         this.precioUnitario = precioUnitario;
         this.activo = activo;
+        this.updatedBy = updatedBy;
         this.updatedAt = updatedAt;
     }
 
@@ -90,6 +97,14 @@ public class InsumoResponse {
 
     public void setActivo(boolean activo) {
         this.activo = activo;
+    }
+
+    public String getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+        this.updatedBy = updatedBy;
     }
 
     public OffsetDateTime getUpdatedAt() {

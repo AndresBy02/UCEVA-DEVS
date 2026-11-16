@@ -1,6 +1,8 @@
 package co.edu.uceva.insumoservice.api;
 
+import co.edu.uceva.insumoservice.api.dto.HistorialPrecioResponse;
 import co.edu.uceva.insumoservice.api.dto.InsumoResponse;
+import co.edu.uceva.insumoservice.model.HistorialPrecioInsumo;
 import co.edu.uceva.insumoservice.model.Insumo;
 import org.springframework.data.domain.Page;
 
@@ -31,7 +33,18 @@ public final class InsumoMapper {
                 insumo.getUnidadMedida() != null ? insumo.getUnidadMedida().name() : null,
                 insumo.getPrecioUnitario(),
                 insumo.isActivo(),
+                insumo.getUpdatedBy(),
                 insumo.getUpdatedAt());
+    }
+
+    public static HistorialPrecioResponse toHistorialResponse(HistorialPrecioInsumo registro) {
+        return new HistorialPrecioResponse(
+                registro.getId(),
+                registro.getInsumoId(),
+                registro.getPrecioAnterior(),
+                registro.getPrecioNuevo(),
+                registro.getModificadoPor(),
+                registro.getFechaCambio());
     }
 
     /**

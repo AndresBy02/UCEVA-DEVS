@@ -1,5 +1,6 @@
 package co.edu.uceva.insumoservice.api;
 
+import co.edu.uceva.insumoservice.api.dto.HistorialPrecioResponse;
 import co.edu.uceva.insumoservice.api.dto.InsumoRequest;
 import co.edu.uceva.insumoservice.api.dto.InsumoResponse;
 import co.edu.uceva.insumoservice.model.Insumo;
@@ -13,9 +14,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -59,10 +63,33 @@ public class InsumoController {
      * @return 201 Created con el header {@code Location} y el insumo persistido
      */
     @PostMapping
-    public ResponseEntity<InsumoResponse> crear(@Valid @RequestBody InsumoRequest request) {
-        Insumo creado = insumoService.crear(request);
+    public ResponseEntity<InsumoResponse> crear(
+            @Valid @RequestBody InsumoRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        String sub = jwt != null ? jwt.getSubject() : null;
+        Insumo creado = sub != null
+                ? insumoService.crear(request, sub)
+                : insumoService.crear(request);
         URI location = URI.create("/api/v1/insumos/" + creado.getId());
         return ResponseEntity.created(location).body(InsumoMapper.toResponse(creado));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<InsumoResponse> actualizar(
+            @PathVariable UUID id,
+            @Valid @RequestBody InsumoRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        String sub = jwt != null ? jwt.getSubject() : null;
+        Insumo actualizado = insumoService.actualizar(id, request, sub);
+        return ResponseEntity.ok(InsumoMapper.toResponse(actualizado));
+    }
+
+    @GetMapping("/{id}/historial-precios")
+    public ResponseEntity<List<HistorialPrecioResponse>> obtenerHistorialPrecios(@PathVariable UUID id) {
+        List<HistorialPrecioResponse> historial = insumoService.obtenerHistorialPrecios(id).stream()
+                .map(InsumoMapper::toHistorialResponse)
+                .toList();
+        return ResponseEntity.ok(historial);
     }
 
     /**
