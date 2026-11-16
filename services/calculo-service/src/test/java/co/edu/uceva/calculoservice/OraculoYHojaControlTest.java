@@ -7,6 +7,8 @@ import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest.FinanciacionRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse;
+import co.edu.uceva.calculoservice.dto.InsumosCriticosRequest;
+import co.edu.uceva.calculoservice.dto.SimulacionSensibilidadRequest;
 import co.edu.uceva.calculoservice.jna.FinanzasLibrary;
 import co.edu.uceva.calculoservice.service.FinanzasEvaluacionService;
 import co.edu.uceva.calculoservice.service.PresupuestoCalculoService;
@@ -14,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.io.BufferedReader;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +40,9 @@ class OraculoYHojaControlTest {
 
     @Autowired
     private FinanzasEvaluacionService finanzasEvaluacionService;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Test
     @DisplayName("CR-01: Insumo con precio 12.345 conserva 3 decimales y redondea parcial con HALF_UP")
@@ -260,6 +267,36 @@ class OraculoYHojaControlTest {
         assertEquals(new BigDecimal("6045263.11"), response.precioVenta());
         assertEquals(new BigDecimal("16.00"), response.margenSobreCostoPorcentaje());
         assertEquals(new BigDecimal("13.79"), response.margenSobrePrecioVentaPorcentaje());
+    }
+
+    @Test
+    @DisplayName("UC-40 y UC-41: Simulacion de sensibilidad de insumo e identificacion de insumos criticos")
+    void testSensibilidadEInsumosCriticos() {
+        ItemRequest pesado = new ItemRequest("I1", "CEM-01", "Cemento estructural", "BULTO",
+                new BigDecimal("100.000"), new BigDecimal("100.000"));
+        ItemRequest despreciable = new ItemRequest("I2", "CLV-01", "Puntilla 2in", "KG",
+                new BigDecimal("1.000"), new BigDecimal("5.000"));
+        CalculoPresupuestoRequest base = new CalculoPresupuestoRequest(
+                new BigDecimal("8.00"), new BigDecimal("3.00"), new BigDecimal("5.00"),
+                new BigDecimal("15000000"), new BigDecimal("250000"), new BigDecimal("175000"),
+                List.of(new CapituloRequest("C1", "Estructura", List.of(pesado, despreciable)))
+        );
+
+        var simPesado = presupuestoCalculoService.simularSensibilidad(
+                new SimulacionSensibilidadRequest("CEM-01", new BigDecimal("10.00"), base));
+        assertEquals(new BigDecimal("10005.00"), simPesado.costoDirectoOriginal());
+        assertEquals(new BigDecimal("11005.00"), simPesado.costoDirectoSimulado());
+        assertEquals(new BigDecimal("1000.00"), simPesado.diferenciaCostoDirecto());
+        assertTrue(simPesado.puntoEquilibrioSimulado().cantidadEquilibrio()
+                .compareTo(simPesado.puntoEquilibrioOriginal().cantidadEquilibrio()) > 0);
+
+        var criticos = presupuestoCalculoService.identificarInsumosCriticos(
+                new InsumosCriticosRequest(new BigDecimal("10.00"), base));
+        assertEquals(2, criticos.insumosCriticos().size());
+        assertEquals("CEM-01", criticos.insumosCriticos().get(0).codigoInsumo());
+        assertEquals("CLV-01", criticos.insumosCriticos().get(1).codigoInsumo());
+        assertTrue(criticos.insumosCriticos().get(0).impactoPrecioVenta()
+                .compareTo(criticos.insumosCriticos().get(1).impactoPrecioVenta()) > 0);
     }
 
     private Path resolverRutaHojaControl() {

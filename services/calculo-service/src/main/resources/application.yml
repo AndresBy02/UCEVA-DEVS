@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: calculo-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/presupuesto-realm}/protocol/openid-connect/certs
 
 calculo:
   finanzas:

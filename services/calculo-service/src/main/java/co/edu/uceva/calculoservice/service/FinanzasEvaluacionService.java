@@ -1,5 +1,6 @@
 package co.edu.uceva.calculoservice.service;
 
+import co.edu.uceva.calculoservice.dto.BenchmarkResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse.AmortizacionResult;
@@ -312,6 +313,44 @@ public class FinanzasEvaluacionService {
                 periodos,
                 cuotaFija,
                 filas
+        );
+    }
+
+    public BenchmarkResponse ejecutarBenchmark(int periodos, int corridas) {
+        int totalPeriodos = Math.max(2, Math.min(periodos, 600));
+        int totalCorridas = Math.max(1, Math.min(corridas, 5000));
+        double[] flujos = new double[totalPeriodos];
+        flujos[0] = -100000.0;
+        for (int i = 1; i < totalPeriodos; i++) {
+            flujos[i] = 1500.0;
+        }
+
+        long inicioJava = System.nanoTime();
+        TirResult ultimaJava = null;
+        for (int i = 0; i < totalCorridas; i++) {
+            ultimaJava = calcularTirJava(flujos, 1e-9, 1000);
+        }
+        long finJavaMs = (System.nanoTime() - inicioJava) / 1_000_000L;
+
+        FinanzasLibrary lib = obtenerBibliotecaNativa();
+        Long finNativoMs = null;
+        TirResult ultima = ultimaJava;
+        if (lib != null && !"JAVA".equalsIgnoreCase(modoConfigurado)) {
+            long inicioNat = System.nanoTime();
+            for (int i = 0; i < totalCorridas; i++) {
+                ultima = calcularTirNativo(flujos, 1e-9, 1000);
+            }
+            finNativoMs = (System.nanoTime() - inicioNat) / 1_000_000L;
+        }
+
+        return new BenchmarkResponse(
+                totalPeriodos,
+                totalCorridas,
+                finNativoMs != null ? "NATIVE_C_LIBFINANZAS" : "JAVA_BASELINE_FALLBACK",
+                finJavaMs,
+                finNativoMs,
+                ultima != null ? ultima.tasaInternaRetorno() : null,
+                ultima != null ? ultima.iteraciones() : 0
         );
     }
 }

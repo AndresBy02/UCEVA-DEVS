@@ -1,9 +1,14 @@
 package co.edu.uceva.calculoservice.controller;
 
+import co.edu.uceva.calculoservice.dto.BenchmarkResponse;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoRequest;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse;
+import co.edu.uceva.calculoservice.dto.InsumosCriticosRequest;
+import co.edu.uceva.calculoservice.dto.InsumosCriticosResponse;
+import co.edu.uceva.calculoservice.dto.SimulacionSensibilidadRequest;
+import co.edu.uceva.calculoservice.dto.SimulacionSensibilidadResponse;
 import co.edu.uceva.calculoservice.dto.SpikeJnaResponse;
 import co.edu.uceva.calculoservice.service.FinanzasEvaluacionService;
 import co.edu.uceva.calculoservice.service.PresupuestoCalculoService;
@@ -50,5 +55,27 @@ public class CalculoController {
             @RequestBody EvaluacionFinancieraRequest request
     ) {
         return ResponseEntity.ok(finanzasEvaluacionService.evaluarProyecto(request));
+    }
+
+    @PostMapping("/sensibilidad")
+    public ResponseEntity<SimulacionSensibilidadResponse> simularSensibilidad(
+            @RequestBody SimulacionSensibilidadRequest request
+    ) {
+        return ResponseEntity.ok(presupuestoCalculoService.simularSensibilidad(request));
+    }
+
+    @PostMapping("/insumos-criticos")
+    public ResponseEntity<InsumosCriticosResponse> identificarInsumosCriticos(
+            @RequestBody InsumosCriticosRequest request
+    ) {
+        return ResponseEntity.ok(presupuestoCalculoService.identificarInsumosCriticos(request));
+    }
+
+    @GetMapping("/benchmark")
+    public ResponseEntity<BenchmarkResponse> ejecutarBenchmark(
+            @RequestParam(defaultValue = "120") int periodos,
+            @RequestParam(defaultValue = "1000") int corridas
+    ) {
+        return ResponseEntity.ok(finanzasEvaluacionService.ejecutarBenchmark(periodos, corridas));
     }
 }
