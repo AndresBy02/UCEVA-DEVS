@@ -1,0 +1,37 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: presupuesto-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/presupuesto_db
+    username: ${POSTGRES_USER:uceva}
+    password: ${POSTGRES_PASSWORD:uceva_secret_2026}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_ISSUER:http://localhost:8080/realms/presupuesto-realm}/protocol/openid-connect/certs
+
+servicios:
+  insumo-url: ${INSUMO_SERVICE_URL:http://localhost:8081}
+  calculo-url: ${CALCULO_SERVICE_URL:http://localhost:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-components: always
