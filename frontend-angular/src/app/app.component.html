@@ -1,0 +1,34 @@
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <a routerLink="/presupuestos" class="brand-title">Presupuestador de Obra UCEVA</a>
+      @if (authService.isAuthenticated()) {
+        <nav class="main-nav">
+          <a routerLink="/presupuestos" routerLinkActive="active">Presupuestos</a>
+          <a routerLink="/escenarios/comparar" routerLinkActive="active">Comparador A vs B</a>
+          <a routerLink="/insumos" routerLinkActive="active">Insumos</a>
+        </nav>
+      }
+    </div>
+
+    <div class="session-controls">
+      @if (authService.isAuthenticated()) {
+        <div class="user-info">
+          <span class="user-name">{{ authService.username() }}</span>
+          <span class="user-meta">sub: <code>{{ authService.userSub() }}</code></span>
+          <span class="role-badge">{{ authService.roles().join(', ') }}</span>
+        </div>
+        <button type="button" class="btn-secondary" (click)="authService.logout()">Cerrar sesión</button>
+      } @else {
+        <button type="button" class="btn-primary" (click)="authService.login()">Iniciar sesión</button>
+      }
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  @if (authService.sessionNotice(); as notice) {
+    <div class="alert-warning">{{ notice }}</div>
+  }
+  <router-outlet />
+</main>

@@ -1,0 +1,5 @@
+.git
+frontend-angular/node_modules
+frontend-angular/.angular
+frontend-angular/dist
+services/*/target

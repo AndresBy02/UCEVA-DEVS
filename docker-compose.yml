@@ -59,6 +59,7 @@ services:
     environment:
       SERVER_PORT: 8083
       CALCULO_FINANZAS_MODO: NATIVE
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/presupuesto-realm
     ports:
       - "8083:8083"
     deploy:
@@ -96,6 +97,61 @@ services:
         reservations:
           cpus: "0.25"
           memory: 256M
+
+  presupuesto-service:
+    build:
+      context: .
+      dockerfile: services/presupuesto-service/Dockerfile
+    image: uceva/presupuesto-service:sprint3
+    container_name: presupuesto-presupuesto-service
+    environment:
+      SERVER_PORT: 8082
+      POSTGRES_HOST: postgres-db
+      POSTGRES_USER: ${POSTGRES_USER:-uceva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uceva_secret_2026}
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/presupuesto-realm
+      INSUMO_SERVICE_URL: http://insumo-service:8081
+      CALCULO_SERVICE_URL: http://calculo-service:8083
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      insumo-service:
+        condition: service_started
+      calculo-service:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  frontend-angular:
+    build:
+      context: ./frontend-angular
+      dockerfile: Dockerfile
+    container_name: presupuesto-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      keycloak:
+        condition: service_started
+      insumo-service:
+        condition: service_started
+      presupuesto-service:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
 
 volumes:
   postgres_data:
