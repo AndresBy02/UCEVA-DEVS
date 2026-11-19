@@ -13,6 +13,7 @@ import {
 } from '../../core/models/api.models';
 import { InsumoApiService } from '../../core/services/insumo-api.service';
 import { PresupuestoApiService } from '../../core/services/presupuesto-api.service';
+import { descargarCsvPresupuesto } from '../../core/utils/presupuesto-csv.util';
 import { extraerErrorHttp } from '../../core/utils/http-error.util';
 
 @Component({
@@ -30,6 +31,7 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
               {{ p.estado }}
             </span>
           </div>
+          <button type="button" class="btn-secondary" (click)="exportarCsv()">Exportar CSV</button>
           @if (authService.isRevisor() && p.estado === 'BORRADOR') {
             <button type="button" class="btn-primary" (click)="aprobar()">Aprobar Presupuesto</button>
           }
@@ -428,6 +430,13 @@ export class PresupuestoDetalleComponent implements OnInit {
         this.errorMsg.set(extraerErrorHttp(err));
       },
     });
+  }
+
+  exportarCsv(): void {
+    const p = this.presupuesto();
+    if (!p) return;
+    descargarCsvPresupuesto(p);
+    this.successMsg.set('Presupuesto exportado a CSV.');
   }
 
   guardarParametros(): void {
