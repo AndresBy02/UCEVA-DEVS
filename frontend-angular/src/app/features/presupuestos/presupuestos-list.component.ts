@@ -109,8 +109,8 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
                   }
                 </td>
                 <td>{{ p.totalCapitulos }} / {{ p.totalItems }}</td>
-                <td><small>{{ p.creadoPor }}</small></td>
-                <td class="actions-cell">
+                <td><span class="sub-chip" [title]="p.creadoPor">{{ p.creadoPor }}</span></td>
+                <td class="actions-cell" style="white-space: nowrap;">
                   <a [routerLink]="['/presupuestos', p.id]" class="btn-primary btn-sm">Abrir</a>
                   @if (authService.isPresupuestador()) {
                     <button type="button" class="btn-outline btn-sm" (click)="abrirDuplicar(p)">

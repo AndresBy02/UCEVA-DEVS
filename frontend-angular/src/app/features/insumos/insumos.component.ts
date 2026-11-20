@@ -172,9 +172,9 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
                 <td>{{ ins.descripcion }}</td>
                 <td><span class="badge-draft" style="background: var(--surface-subtle); color: var(--text); border: 1px solid var(--border);">{{ ins.unidadMedida }}</span></td>
                 <td class="num"><strong>{{ ins.precioUnitario }}</strong></td>
-                <td><small>{{ ins.updatedBy || '-' }}</small></td>
-                <td class="actions-cell">
-                  <button type="button" class="btn-outline btn-sm" (click)="verHistorial(ins)">Ver / Historial</button>
+                <td><span class="sub-chip" [title]="ins.updatedBy || '-'">{{ ins.updatedBy || '-' }}</span></td>
+                <td class="actions-cell" style="white-space: nowrap;">
+                  <button type="button" class="btn-outline btn-sm" (click)="verHistorial(ins)">Historial</button>
                   @if (authService.isPresupuestador()) {
                     <button type="button" class="btn-secondary btn-sm" (click)="editar(ins)">Editar</button>
                   }

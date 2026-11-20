@@ -56,7 +56,7 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
                   <td><strong>t = {{ $index }}</strong></td>
                   <td><small style="color: var(--muted);">{{ $index === 0 ? 'Inversión / Anticipo' : 'Flujo periodo ' + $index }}</small></td>
                   <td class="num">
-                    <input type="number" step="0.01" [formControl]="ctrl" style="width: 150px; text-align: right;" />
+                    <input type="number" step="0.01" [formControl]="ctrl" style="width: 120px; text-align: right;" />
                   </td>
                   <td class="num">
                     @if (flujosArray.length > 2) {

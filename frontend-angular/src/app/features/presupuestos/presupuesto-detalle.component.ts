@@ -232,10 +232,10 @@ type DetalleTab = 'presupuesto' | 'aiu' | 'precios' | 'sensibilidad' | 'versione
                           <th>#</th>
                           <th>Código</th>
                           <th>Insumo</th>
-                          <th>Unidad</th>
-                          <th class="num">Cantidad</th>
-                          <th class="num">Precio Copiado</th>
-                          <th class="num">Valor Parcial (COP)</th>
+                          <th>Und.</th>
+                          <th class="num">Cant.</th>
+                          <th class="num">Precio Unit.</th>
+                          <th class="num">Parcial (COP)</th>
                           <th>Acciones</th>
                         </tr>
                       </thead>
@@ -249,9 +249,9 @@ type DetalleTab = 'presupuesto' | 'aiu' | 'precios' | 'sensibilidad' | 'versione
                             <td class="num">{{ item.cantidad }}</td>
                             <td class="num">{{ item.precioUnitarioCopia }}</td>
                             <td class="num"><strong>$ {{ item.valorParcial | number: '1.2-2' }}</strong></td>
-                            <td class="actions-cell">
-                              <button type="button" class="btn-outline btn-sm" (click)="abrirTrazabilidad(cap, item)">
-                                Cómo se calcula
+                            <td class="actions-cell" style="white-space: nowrap;">
+                              <button type="button" class="btn-outline btn-sm" title="¿Cómo se calcula?" (click)="abrirTrazabilidad(cap, item)">
+                                ?
                               </button>
                               @if (authService.isPresupuestador() && p.estado === 'BORRADOR') {
                                 <button type="button" class="btn-secondary btn-sm" (click)="abrirEditarItem(cap.id, item)">
