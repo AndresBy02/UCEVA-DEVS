@@ -1,32 +1,31 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <a routerLink="/presupuestos" class="brand-title">Presupuestador de Obra UCEVA</a>
       @if (authService.isAuthenticated()) {
-        <nav class="main-nav">
-          <a routerLink="/presupuestos" routerLinkActive="active">Presupuestos</a>
-          <a routerLink="/revision" routerLinkActive="active">
-            En Revisión
-            @if (enRevisionCount() > 0) {
-              <span class="nav-pill">{{ enRevisionCount() }}</span>
-            }
-          </a>
-          <a routerLink="/escenarios/comparar" routerLinkActive="active">Comparador A vs B</a>
-          <a routerLink="/insumos" routerLinkActive="active">Insumos</a>
-          <a routerLink="/evaluacion-financiera" routerLinkActive="active">Evaluación VPN/TIR</a>
-          <a routerLink="/benchmark-jna" routerLinkActive="active">Benchmark JNA</a>
-        </nav>
+        <button
+          type="button"
+          class="sidebar-toggle"
+          (click)="sidebarOpen.set(!sidebarOpen())"
+          aria-label="Alternar menú lateral"
+        >
+          ☰
+        </button>
       }
+      <a routerLink="/presupuestos" class="brand-title">Presupuestador de Obra UCEVA</a>
+      <span class="brand-context">Sistema distribuido de costos · Aritmética exacta COP</span>
     </div>
 
     <div class="session-controls">
       @if (authService.isAuthenticated()) {
-        <div class="user-info">
-          <span class="user-name">{{ authService.username() }}</span>
-          <span class="user-meta">sub: <code>{{ authService.userSub() }}</code></span>
-          <span class="role-badge">{{ authService.roles().join(', ') }}</span>
-        </div>
-        <button type="button" class="btn-secondary" (click)="authService.logout()">Cerrar sesión</button>
+        <span class="role-badge">{{ authService.roles().join(', ') }}</span>
+        <button
+          type="button"
+          class="avatar-btn"
+          (click)="perfilAbierto.set(true)"
+          title="Ver perfil y sesión"
+        >
+          {{ initials() }}
+        </button>
       } @else {
         <button type="button" class="btn-primary" (click)="authService.login()">Iniciar sesión</button>
       }
@@ -34,9 +33,168 @@
   </div>
 </header>
 
-<main class="container">
-  @if (authService.sessionNotice(); as notice) {
-    <div class="alert-warning">{{ notice }}</div>
-  }
-  <router-outlet />
-</main>
+@if (authService.isAuthenticated()) {
+  <div class="app-shell">
+    <aside class="sidebar" [class.open]="sidebarOpen()">
+      <nav class="sidebar-nav" aria-label="Navegación principal">
+        <span class="sidebar-section-label">Espacio de trabajo</span>
+
+        <a routerLink="/inicio" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6.5h-5V21H4a1 1 0 0 1-1-1z" />
+            </svg>
+            Inicio
+          </span>
+        </a>
+
+        <a routerLink="/presupuestos" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+              <path d="M13 3v5h5M8 13h8M8 17h5" />
+            </svg>
+            Mis presupuestos
+          </span>
+        </a>
+
+        <a routerLink="/insumos" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 7h18M3 12h18M3 17h18" />
+            </svg>
+            Catálogo de insumos
+          </span>
+        </a>
+
+        <a routerLink="/escenarios/comparar" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M12 2v20" />
+            </svg>
+            Escenarios A vs B
+          </span>
+        </a>
+
+        <span class="sidebar-section-label">Análisis y Control</span>
+
+        <a routerLink="/evaluacion-financiera" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3v18h18M7 15l4-4 4 3 5-7" />
+            </svg>
+            Evaluación VPN / TIR
+          </span>
+        </a>
+
+        <a routerLink="/revision" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            En Revisión
+          </span>
+          @if (enRevisionCount() > 0) {
+            <span class="nav-pill">{{ enRevisionCount() }}</span>
+          }
+        </a>
+
+        <a routerLink="/benchmark-jna" routerLinkActive="active" class="sidebar-link" (click)="sidebarOpen.set(false)">
+          <span class="sidebar-link-main">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9z" />
+            </svg>
+            Benchmark JNA
+          </span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user-card">
+          <strong>{{ authService.username() }}</strong>
+          <small>{{ authService.roles().join(', ') }}</small>
+          <small>sub: <code>{{ authService.userSub() }}</code></small>
+        </div>
+        <div class="actions-row">
+          <button type="button" class="btn-outline btn-sm" style="flex: 1;" (click)="perfilAbierto.set(true)">
+            Perfil
+          </button>
+          <button type="button" class="btn-secondary btn-sm" style="flex: 1;" (click)="authService.logout()">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-workspace">
+      <main class="container">
+        @if (authService.sessionNotice(); as notice) {
+          <div class="alert-warning" style="margin-bottom: 16px;">{{ notice }}</div>
+        }
+        <router-outlet />
+      </main>
+      <footer class="workspace-footnote">
+        UCEVA Devs · $ COP · Aritmética decimal exacta en servidor (BigDecimal HALF_UP · motor nativo C libfinanzas.so)
+      </footer>
+    </div>
+  </div>
+} @else {
+  <main class="container">
+    @if (authService.sessionNotice(); as notice) {
+      <div class="alert-warning">{{ notice }}</div>
+    }
+    <router-outlet />
+    @if (!isAuthCallback()) {
+      <div class="auth-stage">
+        <div class="auth-card">
+          <h2 class="page-title">Presupuestador de Obra</h2>
+          <p class="page-subtitle">UCEVA Devs · OAuth 2.0 / OIDC con Keycloak (PKCE)</p>
+          <button type="button" class="btn-primary" (click)="authService.login()">
+            Iniciar sesión con Keycloak
+          </button>
+          <small style="color: var(--muted);">
+            Serás redirigido a Keycloak. Esta aplicación nunca ve ni almacena tu contraseña.
+          </small>
+        </div>
+      </div>
+    }
+  </main>
+}
+
+@if (perfilAbierto() && authService.isAuthenticated()) {
+  <div class="modal-backdrop" (click)="perfilAbierto.set(false)">
+    <div class="modal-dialog" (click)="$event.stopPropagation()">
+      <div class="header-row">
+        <div>
+          <h3>Perfil y Sesión (OAuth 2.0 / OIDC)</h3>
+          <p class="page-subtitle">Identidad validada desde el token JWT emitido por Keycloak</p>
+        </div>
+        <button type="button" class="btn-outline btn-sm" (click)="perfilAbierto.set(false)">Cerrar</button>
+      </div>
+
+      <div>
+        <div class="detail-kv">
+          <span>Usuario</span>
+          <strong>{{ authService.username() }}</strong>
+        </div>
+        <div class="detail-kv">
+          <span>Rol asignado</span>
+          <span class="role-badge">{{ authService.roles().join(', ') }}</span>
+        </div>
+        <div class="detail-kv">
+          <span>Identificador (sub)</span>
+          <code>{{ authService.userSub() }}</code>
+        </div>
+        <div class="detail-kv">
+          <span>Realm emisor</span>
+          <strong>presupuesto-realm</strong>
+        </div>
+      </div>
+
+      <div class="actions-row" style="justify-content: flex-end;">
+        <button type="button" class="btn-outline" (click)="perfilAbierto.set(false)">Volver</button>
+        <button type="button" class="btn-danger" (click)="authService.logout()">Cerrar sesión en Keycloak</button>
+      </div>
+    </div>
+  </div>
+}

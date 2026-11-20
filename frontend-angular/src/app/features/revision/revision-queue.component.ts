@@ -14,12 +14,12 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
     <section class="page-section">
       <div class="header-row">
         <div>
-          <h2>Bandeja de Presupuestos en Revisión</h2>
-          <p style="color: var(--muted); margin: 4px 0 0;">
-            Vista de solo lectura para revisión, aprobación o devolución con motivo (<code>UC-43</code>, <code>UC-44</code>, <code>UC-45</code>).
+          <h2 class="page-title">Bandeja de Presupuestos en Revisión</h2>
+          <p class="page-subtitle">
+            Cola de control interno (solo lectura para revisor). Aprobar inmoviliza; rechazar devuelve a Borrador con motivo.
           </p>
         </div>
-        <button type="button" class="btn-secondary" (click)="cargar()">Actualizar Bandeja</button>
+        <button type="button" class="btn-outline" (click)="cargar()">Actualizar Bandeja</button>
       </div>
 
       @if (errorMsg()) {
@@ -28,6 +28,19 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
       @if (successMsg()) {
         <div class="alert-success">{{ successMsg() }}</div>
       }
+
+      <div class="kpi-grid">
+        <div class="stat-box highlight">
+          <span>Pendientes por decidir</span>
+          <strong>{{ pendientes().length }}</strong>
+          <small>Bloqueados contra edición (HTTP 409) hasta tu decisión</small>
+        </div>
+        <div class="stat-box">
+          <span>Perfil activo</span>
+          <strong>{{ authService.isRevisor() ? 'Revisor autorizado' : 'Consulta (Presupuestador)' }}</strong>
+          <small>{{ authService.isRevisor() ? 'Puede aprobar o devolver con motivo' : 'Solo puede inspeccionar estados en revisión' }}</small>
+        </div>
+      </div>
 
       <div class="card">
         @if (cargando() && pendientes().length === 0) {
@@ -50,16 +63,16 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
             @for (p of pendientes(); track p.id) {
               <tr>
                 <td><code>{{ p.codigo }}</code></td>
-                <td>{{ p.nombre }}</td>
+                <td><strong>{{ p.nombre }}</strong></td>
                 <td>{{ p.cliente }}</td>
                 <td><span class="badge-review">{{ p.estado }}</span></td>
                 <td><small>{{ p.enviadoRevisionPor || p.creadoPor }}</small></td>
                 <td>{{ p.totalCapitulos }} / {{ p.totalItems }}</td>
                 <td class="actions-cell">
-                  <a [routerLink]="['/presupuestos', p.id]" class="btn-primary">Inspeccionar (Solo Lectura)</a>
+                  <a [routerLink]="['/presupuestos', p.id]" class="btn-primary btn-sm">Inspeccionar</a>
                   @if (authService.isRevisor()) {
-                    <button type="button" class="btn-secondary" (click)="aprobarRapido(p.id)">Aprobar</button>
-                    <button type="button" class="btn-secondary" (click)="abrirRechazo(p)">Rechazar</button>
+                    <button type="button" class="btn-success btn-sm" (click)="aprobarRapido(p.id)">Aprobar</button>
+                    <button type="button" class="btn-danger btn-sm" (click)="abrirRechazo(p)">Rechazar</button>
                   }
                 </td>
               </tr>
@@ -75,24 +88,37 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
           </tbody>
         </table>
       </div>
+    </section>
 
-      @if (rechazando(); as target) {
-        <div class="card">
-          <h3>Rechazar Presupuesto {{ target.codigo }} · {{ target.nombre }}</h3>
-          <form (ngSubmit)="confirmarRechazo()" class="grid-form">
-            <label style="grid-column: 1 / -1;">
+    @if (rechazando(); as target) {
+      <div class="modal-backdrop" (click)="rechazando.set(null)">
+        <div class="modal-dialog" (click)="$event.stopPropagation()">
+          <div class="header-row">
+            <div>
+              <h3>Rechazar Presupuesto {{ target.codigo }}</h3>
+              <p class="page-subtitle">{{ target.nombre }} · Devuelve el presupuesto a BORRADOR</p>
+            </div>
+            <button type="button" class="btn-outline btn-sm" (click)="rechazando.set(null)">Cerrar</button>
+          </div>
+          <form (ngSubmit)="confirmarRechazo()" class="grid-form" style="grid-template-columns: 1fr;">
+            <label>
               Motivo del rechazo (obligatorio)
-              <input [(ngModel)]="motivoRechazo" name="motivo" required
-                     placeholder="Indique qué capítulos, ítems o porcentajes deben corregirse..." />
+              <textarea
+                rows="3"
+                [(ngModel)]="motivoRechazo"
+                name="motivo"
+                required
+                placeholder="Indique qué capítulos, ítems o porcentajes AIU deben corregirse..."
+              ></textarea>
             </label>
-            <div class="actions-row">
-              <button type="submit" class="btn-primary">Devolver a Borrador</button>
-              <button type="button" class="btn-secondary" (click)="rechazando.set(null)">Cancelar</button>
+            <div class="actions-row" style="justify-content: flex-end;">
+              <button type="button" class="btn-outline" (click)="rechazando.set(null)">Cancelar</button>
+              <button type="submit" class="btn-danger">Devolver a Borrador</button>
             </div>
           </form>
         </div>
-      }
-    </section>
+      </div>
+    }
   `,
 })
 export class RevisionQueueComponent implements OnInit {

@@ -11,7 +11,14 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
   imports: [FormsModule, DecimalPipe],
   template: `
     <section class="page-section">
-      <h2>Comparar Dos Escenarios Lado a Lado</h2>
+      <div>
+        <h2 class="page-title">Comparar Escenarios A / B</h2>
+        <p class="page-subtitle">Contraste exacto por capítulo, costo directo y precio de venta entre alternativas.</p>
+      </div>
+
+      <div class="alert-info">
+        El escenario B es una copia independiente del A. Modificar cantidades, precios o AIU en B no altera ninguna cifra de A.
+      </div>
 
       @if (errorMsg()) {
         <div class="alert-error">{{ errorMsg() }}</div>
@@ -20,20 +27,20 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
       <div class="card">
         <div class="grid-form">
           <label>
-            Escenario A
+            Escenario A (Base)
             <select [(ngModel)]="idA" name="idA">
               <option value="">Seleccione escenario A</option>
               @for (p of presupuestos(); track p.id) {
-                <option [value]="p.id">{{ p.codigo }} - {{ p.nombre }}</option>
+                <option [value]="p.id">{{ p.codigo }} · {{ p.nombre }}</option>
               }
             </select>
           </label>
           <label>
-            Escenario B
+            Escenario B (Alternativo)
             <select [(ngModel)]="idB" name="idB">
               <option value="">Seleccione escenario B</option>
               @for (p of presupuestos(); track p.id) {
-                <option [value]="p.id">{{ p.codigo }} - {{ p.nombre }}</option>
+                <option [value]="p.id">{{ p.codigo }} · {{ p.nombre }}</option>
               }
             </select>
           </label>
@@ -50,42 +57,66 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
         }
       </div>
 
-      @if (resultado()) {
+      @if (resultado(); as res) {
+        <div class="kpi-grid">
+          <div class="stat-box">
+            <span>Costo Directo (A -> B)</span>
+            <strong>{{ res.escenarioA.costoDirecto | number: '1.2-2' }} -> {{ res.escenarioB.costoDirecto | number: '1.2-2' }}</strong>
+            <small>Dif.: {{ res.comparacionTotal.diferenciaCostoDirectoAbsoluta | number: '1.2-2' }} COP ({{ res.comparacionTotal.diferenciaCostoDirectoPorcentual | number: '1.2-2' }}%)</small>
+          </div>
+          <div class="stat-box highlight">
+            <span>Precio de Venta Total (A -> B)</span>
+            <strong>{{ res.escenarioA.precioVenta | number: '1.2-2' }} -> {{ res.escenarioB.precioVenta | number: '1.2-2' }}</strong>
+            <small>Dif.: {{ res.comparacionTotal.diferenciaPrecioVentaAbsoluta | number: '1.2-2' }} COP</small>
+          </div>
+          <div class="stat-box">
+            <span>Variación Precio Venta</span>
+            <strong [class]="res.comparacionTotal.diferenciaPrecioVentaPorcentual > 0 ? 'delta-up' : 'delta-down'">
+              {{ res.comparacionTotal.diferenciaPrecioVentaPorcentual > 0 ? '+' : '' }}{{ res.comparacionTotal.diferenciaPrecioVentaPorcentual | number: '1.2-2' }}%
+            </strong>
+            <small>{{ res.escenarioA.codigo }} frente a {{ res.escenarioB.codigo }}</small>
+          </div>
+        </div>
+
         <div class="card">
-          <h3>Resumen Comparativo</h3>
+          <h3 style="margin-bottom: 10px;">Desglose comparativo por capítulo</h3>
           <table>
             <thead>
               <tr>
-                <th>Concepto</th>
-                <th>{{ resultado()!.escenarioA.codigo }} (A)</th>
-                <th>{{ resultado()!.escenarioB.codigo }} (B)</th>
-                <th>Diferencia Absoluta (COP)</th>
-                <th>Diferencia (%)</th>
+                <th>Capítulo</th>
+                <th class="num">{{ res.escenarioA.codigo }} (A)</th>
+                <th class="num">{{ res.escenarioB.codigo }} (B)</th>
+                <th class="num">Dif. Absoluta (COP)</th>
+                <th class="num">Dif. (%)</th>
               </tr>
             </thead>
             <tbody>
-              @for (cap of resultado()!.capitulos; track cap.codigoCapitulo) {
+              @for (cap of res.capitulos; track cap.codigoCapitulo) {
                 <tr>
-                  <td>{{ cap.codigoCapitulo }} - {{ cap.nombreCapitulo }}</td>
+                  <td><strong>{{ cap.codigoCapitulo }}</strong> · {{ cap.nombreCapitulo }}</td>
                   <td class="num">{{ cap.subtotalEscenarioA | number: '1.2-2' }}</td>
                   <td class="num">{{ cap.subtotalEscenarioB | number: '1.2-2' }}</td>
-                  <td class="num">{{ cap.diferenciaAbsoluta | number: '1.2-2' }}</td>
-                  <td class="num">{{ cap.diferenciaPorcentual | number: '1.2-2' }}%</td>
+                  <td class="num" [class]="cap.diferenciaAbsoluta > 0 ? 'delta-up' : (cap.diferenciaAbsoluta < 0 ? 'delta-down' : '')">
+                    {{ cap.diferenciaAbsoluta > 0 ? '+' : '' }}{{ cap.diferenciaAbsoluta | number: '1.2-2' }}
+                  </td>
+                  <td class="num" [class]="cap.diferenciaPorcentual > 0 ? 'delta-up' : (cap.diferenciaPorcentual < 0 ? 'delta-down' : '')">
+                    {{ cap.diferenciaPorcentual > 0 ? '+' : '' }}{{ cap.diferenciaPorcentual | number: '1.2-2' }}%
+                  </td>
                 </tr>
               }
               <tr class="total-row">
                 <td><strong>Costo Directo Total</strong></td>
-                <td class="num"><strong>{{ resultado()!.escenarioA.costoDirecto | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.escenarioB.costoDirecto | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.comparacionTotal.diferenciaCostoDirectoAbsoluta | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.comparacionTotal.diferenciaCostoDirectoPorcentual | number: '1.2-2' }}%</strong></td>
+                <td class="num"><strong>{{ res.escenarioA.costoDirecto | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.escenarioB.costoDirecto | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.comparacionTotal.diferenciaCostoDirectoAbsoluta | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.comparacionTotal.diferenciaCostoDirectoPorcentual | number: '1.2-2' }}%</strong></td>
               </tr>
               <tr class="total-row">
                 <td><strong>Precio de Venta Total (CD + AIU)</strong></td>
-                <td class="num"><strong>{{ resultado()!.escenarioA.precioVenta | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.escenarioB.precioVenta | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.comparacionTotal.diferenciaPrecioVentaAbsoluta | number: '1.2-2' }}</strong></td>
-                <td class="num"><strong>{{ resultado()!.comparacionTotal.diferenciaPrecioVentaPorcentual | number: '1.2-2' }}%</strong></td>
+                <td class="num"><strong>{{ res.escenarioA.precioVenta | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.escenarioB.precioVenta | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.comparacionTotal.diferenciaPrecioVentaAbsoluta | number: '1.2-2' }}</strong></td>
+                <td class="num"><strong>{{ res.comparacionTotal.diferenciaPrecioVentaPorcentual | number: '1.2-2' }}%</strong></td>
               </tr>
             </tbody>
           </table>
