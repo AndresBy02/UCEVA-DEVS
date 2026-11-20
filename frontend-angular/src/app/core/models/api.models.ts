@@ -107,6 +107,28 @@ export interface PresupuestoResumen {
   fechaAprobacion: string | null;
   totalCapitulos: number;
   totalItems: number;
+  totalVersiones: number;
+}
+
+/** Versión congelada de un presupuesto enviado a revisión (RF-10 / UC-38). */
+export interface VersionPresupuesto {
+  id: string;
+  presupuestoId: string;
+  numero: number;
+  codigoPresupuesto: string;
+  nombrePresupuesto: string;
+  estado: string;
+  creadoPor: string;
+  fechaCreacion: string;
+  destinatarioSub: string;
+  fechaNotificacion: string;
+  mensaje: string | null;
+  snapshotJson: string;
+}
+
+export interface EnviarRevisionRequest {
+  destinatarioSub?: string;
+  mensaje?: string;
 }
 
 export interface CambioPrecioItem {

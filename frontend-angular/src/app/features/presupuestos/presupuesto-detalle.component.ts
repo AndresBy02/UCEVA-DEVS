@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,6 +10,7 @@ import {
   PresupuestoDetalle,
   PrevisualizacionPrecios,
   SimulacionSensibilidad,
+  VersionPresupuesto,
 } from '../../core/models/api.models';
 import { InsumoApiService } from '../../core/services/insumo-api.service';
 import { PresupuestoApiService } from '../../core/services/presupuesto-api.service';
@@ -18,7 +19,7 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
 @Component({
   selector: 'app-presupuesto-detalle',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, RouterLink],
+  imports: [FormsModule, DatePipe, DecimalPipe, RouterLink],
   template: `
     <section class="page-section">
       <div class="header-row">
@@ -30,6 +31,12 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
               {{ p.estado }}
             </span>
           </div>
+          @if (authService.isPresupuestador()) {
+            <button type="button" class="btn-secondary" (click)="enviarARevision()"
+                    [disabled]="enviandoRevision()">
+              {{ enviandoRevision() ? 'Enviando...' : 'Enviar a revisión' }}
+            </button>
+          }
           @if (authService.isRevisor() && p.estado === 'BORRADOR') {
             <button type="button" class="btn-primary" (click)="aprobar()">Aprobar Presupuesto</button>
           }
@@ -59,6 +66,46 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
               </div>
             }
           </div>
+        </div>
+
+        <div class="card">
+          <div class="header-row">
+            <h3>Versiones enviadas a revisión</h3>
+            <span class="badge-draft">{{ versiones().length }} versión(es) congelada(s)</span>
+          </div>
+          <p style="color: var(--muted);">
+            Cada envío congela una copia exacta del presupuesto calculado. Las versiones no se modifican.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Versión</th>
+                <th>Fecha de envío</th>
+                <th>Enviada por</th>
+                <th>Revisor notificado</th>
+                <th>Mensaje</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (version of versiones(); track version.id) {
+                <tr>
+                  <td><strong>#{{ version.numero }}</strong><br /><code>{{ version.codigoPresupuesto }}</code></td>
+                  <td>{{ version.fechaCreacion | date: 'yyyy-MM-dd HH:mm' }}</td>
+                  <td><code>{{ version.creadoPor }}</code></td>
+                  <td><code>{{ version.destinatarioSub }}</code></td>
+                  <td>{{ version.mensaje || '-' }}</td>
+                  <td><span class="badge-approved">{{ version.estado }}</span></td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" style="color: var(--muted);">
+                    Aún no se ha enviado ninguna versión a revisión.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
 
         <div class="card">
@@ -387,6 +434,8 @@ export class PresupuestoDetalleComponent implements OnInit {
   readonly previewPrecios = signal<PrevisualizacionPrecios | null>(null);
   readonly simulacion = signal<SimulacionSensibilidad | null>(null);
   readonly criticos = signal<InsumosCriticos | null>(null);
+  readonly versiones = signal<VersionPresupuesto[]>([]);
+  readonly enviandoRevision = signal<boolean>(false);
   readonly editandoItem = signal<{ capituloId: string; item: ItemPresupuestoDetalle } | null>(null);
   readonly cargando = signal<boolean>(false);
   readonly errorMsg = signal<string | null>(null);
@@ -421,6 +470,7 @@ export class PresupuestoDetalleComponent implements OnInit {
     this.api.obtenerDetalle(this.presupuestoId).subscribe({
       next: (detalle) => {
         this.aplicarDetalle(detalle);
+        this.cargarVersiones();
         this.cargando.set(false);
       },
       error: (err) => {
@@ -548,6 +598,31 @@ export class PresupuestoDetalleComponent implements OnInit {
     this.api.obtenerInsumosCriticos(this.presupuestoId, this.simForm.porcentajeVariacion || 10).subscribe({
       next: (res) => this.criticos.set(res),
       error: (err) => this.errorMsg.set(extraerErrorHttp(err)),
+    });
+  }
+
+  cargarVersiones(): void {
+    this.api.listarVersiones(this.presupuestoId).subscribe({
+      next: (versiones) => this.versiones.set(versiones),
+      error: (err) => this.errorMsg.set(extraerErrorHttp(err)),
+    });
+  }
+
+  enviarARevision(): void {
+    this.errorMsg.set(null);
+    this.enviandoRevision.set(true);
+    this.api.enviarARevision(this.presupuestoId, { mensaje: 'Envío a revisión desde el presupuestador.' }).subscribe({
+      next: (version) => {
+        this.versiones.update((actuales) => [version, ...actuales]);
+        this.enviandoRevision.set(false);
+        this.successMsg.set(
+          `Versión #${version.numero} congelada. Notificación registrada para ${version.destinatarioSub}.`,
+        );
+      },
+      error: (err) => {
+        this.enviandoRevision.set(false);
+        this.errorMsg.set(extraerErrorHttp(err));
+      },
     });
   }
 

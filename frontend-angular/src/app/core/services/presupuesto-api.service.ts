@@ -3,11 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ComparacionEscenarios,
+  EnviarRevisionRequest,
   InsumosCriticos,
   PresupuestoDetalle,
   PresupuestoResumen,
   PrevisualizacionPrecios,
   SimulacionSensibilidad,
+  VersionPresupuesto,
 } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
@@ -118,5 +120,16 @@ export class PresupuestoApiService {
 
   aprobar(id: string): Observable<PresupuestoDetalle> {
     return this.http.post<PresupuestoDetalle>(`${this.baseUrl}/${id}/aprobar`, {});
+  }
+
+  enviarARevision(
+    id: string,
+    request: EnviarRevisionRequest = {},
+  ): Observable<VersionPresupuesto> {
+    return this.http.post<VersionPresupuesto>(`${this.baseUrl}/${id}/enviar-revision`, request);
+  }
+
+  listarVersiones(id: string): Observable<VersionPresupuesto[]> {
+    return this.http.get<VersionPresupuesto[]>(`${this.baseUrl}/${id}/versiones`);
   }
 }

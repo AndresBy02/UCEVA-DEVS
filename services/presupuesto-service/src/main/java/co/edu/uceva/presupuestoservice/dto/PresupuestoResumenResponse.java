@@ -21,6 +21,7 @@ public record PresupuestoResumenResponse(
         String aprobadoPor,
         OffsetDateTime fechaAprobacion,
         int totalCapitulos,
-        int totalItems
+        int totalItems,
+        int totalVersiones
 ) {
 }

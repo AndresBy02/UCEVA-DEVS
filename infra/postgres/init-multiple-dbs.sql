@@ -64,3 +64,20 @@ CREATE TABLE IF NOT EXISTS items_presupuesto (
     cantidad NUMERIC(19, 3) NOT NULL CHECK (cantidad > 0),
     precio_unitario_copia NUMERIC(19, 3) NOT NULL CHECK (precio_unitario_copia >= 0)
 );
+
+-- RF-10 / UC-38: snapshot inmutable de cada envío a revisión.
+CREATE TABLE IF NOT EXISTS versiones_presupuesto (
+    id UUID PRIMARY KEY,
+    presupuesto_id UUID NOT NULL REFERENCES presupuestos(id) ON DELETE CASCADE,
+    numero INTEGER NOT NULL,
+    codigo_presupuesto VARCHAR(40) NOT NULL,
+    nombre_presupuesto VARCHAR(200) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'ENVIADA',
+    creado_por VARCHAR(100) NOT NULL,
+    fecha_creacion TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    destinatario_sub VARCHAR(100) NOT NULL,
+    fecha_notificacion TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    mensaje VARCHAR(500),
+    snapshot_json TEXT NOT NULL,
+    CONSTRAINT uk_versiones_presupuesto_numero UNIQUE (presupuesto_id, numero)
+);

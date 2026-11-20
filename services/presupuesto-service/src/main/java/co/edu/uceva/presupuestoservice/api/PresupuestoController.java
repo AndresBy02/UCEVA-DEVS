@@ -5,6 +5,7 @@ import co.edu.uceva.presupuestoservice.dto.CalculoDtos.SimulacionSensibilidadRes
 import co.edu.uceva.presupuestoservice.dto.CapituloCreateRequest;
 import co.edu.uceva.presupuestoservice.dto.ComparacionEscenariosResponse;
 import co.edu.uceva.presupuestoservice.dto.DuplicarEscenarioRequest;
+import co.edu.uceva.presupuestoservice.dto.EnviarRevisionRequest;
 import co.edu.uceva.presupuestoservice.dto.ItemCreateRequest;
 import co.edu.uceva.presupuestoservice.dto.ItemUpdateRequest;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoDetalleResponse;
@@ -13,6 +14,7 @@ import co.edu.uceva.presupuestoservice.dto.PresupuestoResumenResponse;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoUpdateRequest;
 import co.edu.uceva.presupuestoservice.dto.PrevisualizacionPreciosResponse;
 import co.edu.uceva.presupuestoservice.dto.SensibilidadRequest;
+import co.edu.uceva.presupuestoservice.dto.VersionPresupuestoResponse;
 import co.edu.uceva.presupuestoservice.service.PresupuestoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -166,6 +168,19 @@ public class PresupuestoController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(presupuestoService.aprobarPresupuesto(id, extraerSub(jwt)));
+    }
+
+    @PostMapping("/{id}/enviar-revision")
+    public ResponseEntity<VersionPresupuestoResponse> enviarARevision(
+            @PathVariable UUID id,
+            @RequestBody(required = false) EnviarRevisionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(presupuestoService.enviarARevision(id, request, extraerSub(jwt)));
+    }
+
+    @GetMapping("/{id}/versiones")
+    public ResponseEntity<List<VersionPresupuestoResponse>> listarVersiones(@PathVariable UUID id) {
+        return ResponseEntity.ok(presupuestoService.listarVersiones(id));
     }
 
     private static String extraerSub(Jwt jwt) {

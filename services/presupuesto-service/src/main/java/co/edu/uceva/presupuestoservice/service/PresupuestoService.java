@@ -17,6 +17,7 @@ import co.edu.uceva.presupuestoservice.dto.ComparacionEscenariosResponse.Compara
 import co.edu.uceva.presupuestoservice.dto.ComparacionEscenariosResponse.ComparacionTotal;
 import co.edu.uceva.presupuestoservice.dto.ComparacionEscenariosResponse.EscenarioResumen;
 import co.edu.uceva.presupuestoservice.dto.DuplicarEscenarioRequest;
+import co.edu.uceva.presupuestoservice.dto.EnviarRevisionRequest;
 import co.edu.uceva.presupuestoservice.dto.InsumoCatalogoDto;
 import co.edu.uceva.presupuestoservice.dto.ItemCreateRequest;
 import co.edu.uceva.presupuestoservice.dto.ItemUpdateRequest;
@@ -28,11 +29,18 @@ import co.edu.uceva.presupuestoservice.dto.PresupuestoResumenResponse;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoUpdateRequest;
 import co.edu.uceva.presupuestoservice.dto.PrevisualizacionPreciosResponse;
 import co.edu.uceva.presupuestoservice.dto.PrevisualizacionPreciosResponse.CambioPrecioItem;
+import co.edu.uceva.presupuestoservice.dto.VersionPresupuestoResponse;
 import co.edu.uceva.presupuestoservice.model.Capitulo;
 import co.edu.uceva.presupuestoservice.model.EstadoPresupuesto;
 import co.edu.uceva.presupuestoservice.model.ItemPresupuesto;
 import co.edu.uceva.presupuestoservice.model.Presupuesto;
+import co.edu.uceva.presupuestoservice.model.VersionPresupuesto;
 import co.edu.uceva.presupuestoservice.repository.PresupuestoRepository;
+import co.edu.uceva.presupuestoservice.repository.VersionPresupuestoRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,20 +60,28 @@ import java.util.UUID;
 @Service
 public class PresupuestoService {
 
+    private static final Logger log = LoggerFactory.getLogger(PresupuestoService.class);
     private static final BigDecimal CIEN = new BigDecimal("100");
     private static final BigDecimal CERO_MONEDA = new BigDecimal("0.00");
+    private static final String DESTINATARIO_REVISION_POR_DEFECTO = "revisor";
 
     private final PresupuestoRepository presupuestoRepository;
+    private final VersionPresupuestoRepository versionPresupuestoRepository;
     private final InsumoCatalogoClient insumoCatalogoClient;
     private final CalculoMotorClient calculoMotorClient;
+    private final ObjectMapper objectMapper;
 
     public PresupuestoService(
             PresupuestoRepository presupuestoRepository,
+            VersionPresupuestoRepository versionPresupuestoRepository,
             InsumoCatalogoClient insumoCatalogoClient,
-            CalculoMotorClient calculoMotorClient) {
+            CalculoMotorClient calculoMotorClient,
+            ObjectMapper objectMapper) {
         this.presupuestoRepository = presupuestoRepository;
+        this.versionPresupuestoRepository = versionPresupuestoRepository;
         this.insumoCatalogoClient = insumoCatalogoClient;
         this.calculoMotorClient = calculoMotorClient;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -116,18 +132,18 @@ public class PresupuestoService {
     @Transactional(readOnly = true)
     public List<PresupuestoResumenResponse> listarPresupuestos() {
         return presupuestoRepository.findAllByOrderByFechaCreacionDesc().stream()
-                .map(PresupuestoService::aResumenResponse)
+                .map(this::aResumenResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<PresupuestoResumenResponse> listarPorInsumo(UUID insumoId) {
         return presupuestoRepository.findDistinctByInsumoId(insumoId).stream()
-                .map(PresupuestoService::aResumenResponse)
+                .map(this::aResumenResponse)
                 .toList();
     }
 
-    private static PresupuestoResumenResponse aResumenResponse(Presupuesto p) {
+    private PresupuestoResumenResponse aResumenResponse(Presupuesto p) {
         int totalItems = p.getCapitulos().stream()
                 .mapToInt(c -> c.getItems().size())
                 .sum();
@@ -146,7 +162,8 @@ public class PresupuestoService {
                 p.getAprobadoPor(),
                 p.getFechaAprobacion(),
                 p.getCapitulos().size(),
-                totalItems
+                totalItems,
+                (int) versionPresupuestoRepository.countByPresupuestoId(p.getId())
         );
     }
 
@@ -437,6 +454,79 @@ public class PresupuestoService {
         p.setAprobadoPor(revisorSub);
         p.setFechaAprobacion(OffsetDateTime.now(ZoneOffset.UTC));
         return construirDetalleCalculado(presupuestoRepository.save(p));
+    }
+
+    /**
+     * RF-10 / UC-38: congela el detalle calculado completo en una versión
+     * inmutable y registra la notificación al revisor.
+     */
+    @Transactional
+    public VersionPresupuestoResponse enviarARevision(
+            UUID id, EnviarRevisionRequest request, String usuarioSub) {
+        Presupuesto p = buscarPorId(id);
+        PresupuestoDetalleResponse detalle = construirDetalleCalculado(p);
+
+        String snapshotJson;
+        try {
+            snapshotJson = objectMapper.writeValueAsString(detalle);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "No fue posible congelar la versión del presupuesto " + p.getCodigo(), e);
+        }
+
+        VersionPresupuesto ultima = versionPresupuestoRepository.findTopByPresupuestoIdOrderByNumeroDesc(id);
+        int numero = ultima == null ? 1 : ultima.getNumero() + 1;
+        String destinatario = request != null && request.destinatarioSub() != null
+                && !request.destinatarioSub().isBlank()
+                ? request.destinatarioSub().trim()
+                : DESTINATARIO_REVISION_POR_DEFECTO;
+        String mensaje = request != null && request.mensaje() != null
+                ? request.mensaje().trim()
+                : null;
+        OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
+
+        VersionPresupuesto version = new VersionPresupuesto();
+        version.setPresupuestoId(id);
+        version.setNumero(numero);
+        version.setCodigoPresupuesto(p.getCodigo());
+        version.setNombrePresupuesto(p.getNombre());
+        version.setEstado("ENVIADA");
+        version.setCreadoPor(usuarioSub);
+        version.setFechaCreacion(ahora);
+        version.setDestinatarioSub(destinatario);
+        version.setFechaNotificacion(ahora);
+        version.setMensaje(mensaje);
+        version.setSnapshotJson(snapshotJson);
+
+        VersionPresupuesto guardada = versionPresupuestoRepository.save(version);
+        log.info("UC-38: versión {} congelada del presupuesto {} y notificación registrada al revisor {}",
+                numero, p.getCodigo(), destinatario);
+        return aVersionResponse(guardada);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VersionPresupuestoResponse> listarVersiones(UUID id) {
+        buscarPorId(id);
+        return versionPresupuestoRepository.findByPresupuestoIdOrderByNumeroDesc(id).stream()
+                .map(PresupuestoService::aVersionResponse)
+                .toList();
+    }
+
+    private static VersionPresupuestoResponse aVersionResponse(VersionPresupuesto version) {
+        return new VersionPresupuestoResponse(
+                version.getId(),
+                version.getPresupuestoId(),
+                version.getNumero(),
+                version.getCodigoPresupuesto(),
+                version.getNombrePresupuesto(),
+                version.getEstado(),
+                version.getCreadoPor(),
+                version.getFechaCreacion(),
+                version.getDestinatarioSub(),
+                version.getFechaNotificacion(),
+                version.getMensaje(),
+                version.getSnapshotJson()
+        );
     }
 
     private Presupuesto buscarPorId(UUID id) {

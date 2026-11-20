@@ -56,6 +56,7 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
               <th>Cliente</th>
               <th>Estado</th>
               <th>Capítulos / Ítems</th>
+              <th>Versiones</th>
               <th>Creado Por (sub)</th>
               <th>Acciones</th>
             </tr>
@@ -72,6 +73,11 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
                   </span>
                 </td>
                 <td>{{ p.totalCapitulos }} / {{ p.totalItems }}</td>
+                <td>
+                  <a [routerLink]="['/presupuestos', p.id]" class="btn-secondary">
+                    {{ p.totalVersiones }} congelada(s)
+                  </a>
+                </td>
                 <td><small>{{ p.creadoPor }}</small></td>
                 <td class="actions-cell">
                   <a [routerLink]="['/presupuestos', p.id]" class="btn-primary">Abrir</a>
@@ -85,7 +91,7 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
             } @empty {
               @if (!cargando()) {
                 <tr>
-                  <td colspan="7" style="color: var(--muted);">No hay presupuestos registrados todavía.</td>
+                  <td colspan="8" style="color: var(--muted);">No hay presupuestos registrados todavía.</td>
                 </tr>
               }
             }
