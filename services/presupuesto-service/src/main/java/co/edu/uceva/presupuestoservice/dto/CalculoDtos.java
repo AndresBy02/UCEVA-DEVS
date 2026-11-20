@@ -112,4 +112,37 @@ public final class CalculoDtos {
                 BigDecimal impactoPrecioVenta
         ) {}
     }
+
+    public record DesembolsosRequest(
+            Integer semanas,
+            List<CapituloDesembolsoInput> capitulos
+    ) {
+        public record CapituloDesembolsoInput(
+                String capituloId,
+                String codigo,
+                String nombre,
+                BigDecimal subtotalCapitulo,
+                List<BigDecimal> porcentajesPorSemana
+        ) {}
+    }
+
+    public record DesembolsosResponse(
+            int semanas,
+            BigDecimal costoDirectoTotal,
+            BigDecimal totalDesembolsado,
+            BigDecimal diferenciaValidacion,
+            List<CapituloDesembolso> capitulos,
+            List<BigDecimal> totalesPorSemana,
+            List<BigDecimal> acumuladosPorSemana
+    ) {
+        public record CapituloDesembolso(
+                String capituloId,
+                String codigo,
+                String nombre,
+                BigDecimal subtotalCapitulo,
+                BigDecimal totalCapituloDesembolsado,
+                List<BigDecimal> porcentajesPorSemana,
+                List<BigDecimal> montosPorSemana
+        ) {}
+    }
 }

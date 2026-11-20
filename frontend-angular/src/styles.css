@@ -313,7 +313,8 @@ th {
 }
 
 .badge-approved,
-.badge-draft {
+.badge-draft,
+.badge-review {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
@@ -329,6 +330,22 @@ th {
 .badge-draft {
   background: var(--warning-bg);
   color: var(--warning-text);
+}
+
+.badge-review {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.nav-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .alert-error,

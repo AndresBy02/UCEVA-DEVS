@@ -84,6 +84,21 @@ int main(void) {
     verificar_casi_igual("CR-14-CUOTA", "Cuota fija periodo 1", 3467.546726, cuotas[0], 1e-4);
     verificar_casi_igual("CR-14-SALDO", "Saldo final en periodo 3 es 0.00", 0.0, cuotas[11], 1e-9);
 
+    /* CR-16 (UC-67): Flujo con mas de una TIR posible [-1000, 2500, -1550] */
+    double flujos_cr16[] = {-1000.0, 2500.0, -1550.0};
+    rc = fin_tir(flujos_cr16, 3, 1e-9, 1000, &tir_out, &iter_out);
+    verificar_entero("CR-16-RC", "Multi-TIR [-1000, 2500, -1550] converge a raiz real", FIN_OK, rc);
+    verificar_casi_igual("CR-16-VPN", "VPN(TIR) en raiz Multi-TIR es 0", 0.0, fin_vpn(tir_out, flujos_cr16, 3), 1e-6);
+
+    /* CR-17 (UC-66): 4ta funcion financiera - TIRM (Tasa Interna de Retorno Modificada) */
+    double tirm_out = 0.0;
+    rc = fin_tirm(flujos_cr11, 4, 0.05, 0.08, &tirm_out);
+    verificar_entero("CR-17-RC", "Retorno TIRM [-10000, 3500, 4000, 4500] (rf=5%, rr=8%)", FIN_OK, rc);
+    verificar_casi_igual("CR-17-VAL", "Valor TIRM esperado (12902.40/10000)^(1/3)-1", 0.08865475, tirm_out, 1e-6);
+
+    rc = fin_tirm(flujos_cr12, 3, 0.05, 0.08, &tirm_out);
+    verificar_entero("CR-17-ERR", "TIRM sin cambio de signo devuelve FIN_ERR_SIN_CAMBIO_SIGNO (-3)", FIN_ERR_SIN_CAMBIO_SIGNO, rc);
+
     printf("==============================================================\n");
     printf("Resumen C: %d pruebas ejecutadas, %d fallos.\n", ejecutados, fallos);
     return (fallos == 0) ? EXIT_SUCCESS : EXIT_FAILURE;

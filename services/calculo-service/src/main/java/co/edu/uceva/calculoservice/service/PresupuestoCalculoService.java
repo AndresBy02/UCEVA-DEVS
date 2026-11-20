@@ -5,6 +5,9 @@ import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse.CapituloCalculado;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse.ItemCalculado;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse.PuntoEquilibrioResult;
+import co.edu.uceva.calculoservice.dto.DesembolsosRequest;
+import co.edu.uceva.calculoservice.dto.DesembolsosResponse;
+import co.edu.uceva.calculoservice.dto.DesembolsosResponse.CapituloDesembolso;
 import co.edu.uceva.calculoservice.dto.InsumosCriticosRequest;
 import co.edu.uceva.calculoservice.dto.InsumosCriticosResponse;
 import co.edu.uceva.calculoservice.dto.InsumosCriticosResponse.InsumoCriticoItem;
@@ -298,6 +301,120 @@ public class PresupuestoCalculoService {
                 base.precioVenta(),
                 porcRef,
                 criticos
+        );
+    }
+
+    /**
+     * Calcula el cronograma semanal de desembolsos por capítulo (UC-42 / RF-12),
+     * garantizando mediante ajuste exacto de residuo en la última semana activa
+     * que la suma de todos los desembolsos coincida hasta el centavo con el
+     * Costo Directo total.
+     */
+    public DesembolsosResponse calcularDesembolsos(DesembolsosRequest request) {
+        if (request == null || request.semanas() == null || request.semanas() < 1 || request.semanas() > 260) {
+            throw new IllegalArgumentException("El número de semanas debe estar entre 1 y 260.");
+        }
+        int semanas = request.semanas();
+        List<DesembolsosRequest.CapituloDesembolsoInput> capsIn =
+                request.capitulos() != null ? request.capitulos() : Collections.emptyList();
+
+        List<CapituloDesembolso> capsOut = new ArrayList<>(capsIn.size());
+        BigDecimal[] totalesSemana = new BigDecimal[semanas];
+        for (int s = 0; s < semanas; s++) {
+            totalesSemana[s] = CERO_MONEDA;
+        }
+        BigDecimal costoDirectoTotal = CERO_MONEDA;
+        BigDecimal totalDesembolsado = CERO_MONEDA;
+
+        for (var cap : capsIn) {
+            BigDecimal subtotal = cap.subtotalCapitulo() != null
+                    ? cap.subtotalCapitulo().setScale(2, RoundingMode.HALF_UP)
+                    : CERO_MONEDA;
+            costoDirectoTotal = costoDirectoTotal.add(subtotal);
+
+            List<BigDecimal> porcentajesRaw = cap.porcentajesPorSemana() != null
+                    ? cap.porcentajesPorSemana()
+                    : Collections.emptyList();
+            if (porcentajesRaw.size() != semanas) {
+                throw new IllegalArgumentException(
+                        "El capítulo " + cap.codigo() + " debe especificar exactamente " + semanas + " porcentajes.");
+            }
+
+            List<BigDecimal> porcentajes = new ArrayList<>(semanas);
+            BigDecimal sumaPct = BigDecimal.ZERO;
+            int ultimaSemanaActiva = -1;
+            for (int s = 0; s < semanas; s++) {
+                BigDecimal pct = porcentajesRaw.get(s) != null
+                        ? porcentajesRaw.get(s).setScale(4, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+                if (pct.compareTo(BigDecimal.ZERO) < 0 || pct.compareTo(CIEN) > 0) {
+                    throw new IllegalArgumentException(
+                            "Los porcentajes de avance deben estar entre 0 y 100 en el capítulo " + cap.codigo());
+                }
+                if (pct.compareTo(BigDecimal.ZERO) > 0) {
+                    ultimaSemanaActiva = s;
+                }
+                porcentajes.add(pct);
+                sumaPct = sumaPct.add(pct);
+            }
+
+            if (subtotal.compareTo(BigDecimal.ZERO) > 0
+                    && sumaPct.subtract(CIEN).abs().compareTo(new BigDecimal("0.01")) > 0) {
+                throw new IllegalArgumentException(
+                        "La suma de avance del capítulo " + cap.codigo() + " debe ser 100% (actual: "
+                                + sumaPct.setScale(2, RoundingMode.HALF_UP) + "%).");
+            }
+
+            List<BigDecimal> montos = new ArrayList<>(Collections.nCopies(semanas, CERO_MONEDA));
+            BigDecimal acumuladoCap = CERO_MONEDA;
+            if (subtotal.compareTo(BigDecimal.ZERO) > 0 && ultimaSemanaActiva >= 0) {
+                for (int s = 0; s < semanas; s++) {
+                    if (s == ultimaSemanaActiva) {
+                        BigDecimal residuo = subtotal.subtract(acumuladoCap).setScale(2, RoundingMode.HALF_UP);
+                        montos.set(s, residuo);
+                        acumuladoCap = acumuladoCap.add(residuo);
+                    } else {
+                        BigDecimal montoSemana = subtotal.multiply(porcentajes.get(s))
+                                .divide(CIEN, 2, RoundingMode.HALF_UP);
+                        montos.set(s, montoSemana);
+                        acumuladoCap = acumuladoCap.add(montoSemana);
+                    }
+                }
+            }
+
+            for (int s = 0; s < semanas; s++) {
+                totalesSemana[s] = totalesSemana[s].add(montos.get(s));
+            }
+            totalDesembolsado = totalDesembolsado.add(acumuladoCap);
+
+            capsOut.add(new CapituloDesembolso(
+                    cap.capituloId(),
+                    cap.codigo(),
+                    cap.nombre(),
+                    subtotal,
+                    acumuladoCap,
+                    porcentajes,
+                    montos
+            ));
+        }
+
+        List<BigDecimal> totalesOut = new ArrayList<>(semanas);
+        List<BigDecimal> acumuladosOut = new ArrayList<>(semanas);
+        BigDecimal corr = CERO_MONEDA;
+        for (int s = 0; s < semanas; s++) {
+            totalesOut.add(totalesSemana[s]);
+            corr = corr.add(totalesSemana[s]);
+            acumuladosOut.add(corr);
+        }
+
+        return new DesembolsosResponse(
+                semanas,
+                costoDirectoTotal,
+                totalDesembolsado,
+                costoDirectoTotal.subtract(totalDesembolsado).setScale(2, RoundingMode.HALF_UP),
+                capsOut,
+                totalesOut,
+                acumuladosOut
         );
     }
 

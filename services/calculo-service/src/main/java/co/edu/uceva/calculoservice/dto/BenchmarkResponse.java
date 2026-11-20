@@ -8,6 +8,13 @@ public record BenchmarkResponse(
         String motorActivo,
         long tiempoJavaMs,
         Long tiempoNativoMs,
+        Long tiempoNativoPorIteracionMs,
+        double tiempoJavaMsExacto,
+        Double tiempoNativoMsExacto,
+        Double tiempoNativoPorIteracionMsExacto,
+        long totalLlamadasJnaPorCorrida,
+        long totalLlamadasJnaPorIteracion,
+        Double factorSobrecostoJna,
         BigDecimal tirResultado,
         int iteracionesPorCorrida
 ) {

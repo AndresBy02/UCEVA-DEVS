@@ -75,8 +75,9 @@ class VersionPresupuestoRevisionTest {
                                 {"destinatarioSub":"sub-carlos-02","mensaje":"Revisar antes de enviar al cliente"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.numero").value(1))
-                .andExpect(jsonPath("$.estado").value("ENVIADA"))
+                .andExpect(jsonPath("$.numeroVersion").value(1))
+                .andExpect(jsonPath("$.estado").value("EN_REVISION"))
+                .andExpect(jsonPath("$.estadoVersion").value("ENVIADA"))
                 .andExpect(jsonPath("$.creadoPor").value("sub-ana-01"))
                 .andExpect(jsonPath("$.destinatarioSub").value("sub-carlos-02"))
                 .andExpect(jsonPath("$.fechaNotificacion").exists())
@@ -87,16 +88,27 @@ class VersionPresupuestoRevisionTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].numero").value(1))
+                .andExpect(jsonPath("$[0].numeroVersion").value(1))
                 .andExpect(jsonPath("$[0].destinatarioSub").value("sub-carlos-02"));
 
+        // main: mientras está EN_REVISION la edición queda bloqueada (409).
         mockMvc.perform(put("/api/v1/presupuestos/" + id)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nombre":"Presupuesto modificado despues del envio","cliente":"Cliente"}
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isConflict());
+
+        // El revisor devuelve a BORRADOR para poder congelar una segunda versión.
+        mockMvc.perform(post("/api/v1/presupuestos/" + id + "/rechazar")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"motivo":"Ajustar antes de reenviar"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("BORRADOR"));
 
         mockMvc.perform(get("/api/v1/presupuestos/" + id + "/versiones")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador"))
@@ -110,15 +122,15 @@ class VersionPresupuestoRevisionTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.numero").value(2))
+                .andExpect(jsonPath("$.numeroVersion").value(2))
                 .andExpect(jsonPath("$.destinatarioSub").value("revisor"));
 
         mockMvc.perform(get("/api/v1/presupuestos/" + id + "/versiones")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].numero").value(2))
-                .andExpect(jsonPath("$[1].numero").value(1));
+                .andExpect(jsonPath("$[0].numeroVersion").value(2))
+                .andExpect(jsonPath("$[1].numeroVersion").value(1));
 
         mockMvc.perform(get("/api/v1/presupuestos")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))

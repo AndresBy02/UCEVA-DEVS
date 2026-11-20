@@ -1,9 +1,13 @@
 package co.edu.uceva.calculoservice;
 
+import co.edu.uceva.calculoservice.dto.BenchmarkResponse;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoRequest;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoRequest.CapituloRequest;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoRequest.ItemRequest;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse;
+import co.edu.uceva.calculoservice.dto.DesembolsosRequest;
+import co.edu.uceva.calculoservice.dto.DesembolsosRequest.CapituloDesembolsoInput;
+import co.edu.uceva.calculoservice.dto.DesembolsosResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest.FinanciacionRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse;
@@ -132,9 +136,31 @@ class OraculoYHojaControlTest {
     }
 
     @Test
-    @DisplayName("CR-08 a CR-14: VPN, TIR convergente, flujos sin cambio de signo, no convergencia y amortizacion")
+    @DisplayName("CR-08 a CR-14 + Multi-TIR: VPN, TIR convergente, multiple raiz, sin cambio de signo, no convergencia y amortizacion")
     void testCr08a14EvaluacionFinanciera() {
-        /* CR-08 y CR-11 + CR-14 */
+        /* CR-08: VPN flujo estandar r=10% */
+        EvaluacionFinancieraResponse cr08 = finanzasEvaluacionService.evaluarProyecto(new EvaluacionFinancieraRequest(
+                new BigDecimal("0.10"),
+                List.of(new BigDecimal("-1000"), new BigDecimal("500"), new BigDecimal("500"), new BigDecimal("500")),
+                1e-9, 1000, null));
+        assertEquals(new BigDecimal("243.43"), cr08.vpn());
+
+        /* CR-09: VPN tasa cero */
+        EvaluacionFinancieraResponse cr09 = finanzasEvaluacionService.evaluarProyecto(new EvaluacionFinancieraRequest(
+                new BigDecimal("0.00"),
+                List.of(new BigDecimal("-1000"), new BigDecimal("400"), new BigDecimal("350"), new BigDecimal("500")),
+                1e-9, 1000, null));
+        assertEquals(new BigDecimal("250.00"), cr09.vpn());
+
+        /* CR-10: TIR clasico 1 periodo [-1000, 1100] -> 10% */
+        EvaluacionFinancieraResponse cr10 = finanzasEvaluacionService.evaluarProyecto(new EvaluacionFinancieraRequest(
+                new BigDecimal("0.05"),
+                List.of(new BigDecimal("-1000"), new BigDecimal("1100")),
+                1e-9, 1000, null));
+        assertTrue(cr10.tir().convergio());
+        assertEquals(new BigDecimal("0.100000"), cr10.tir().tasaInternaRetorno());
+
+        /* CR-11 + CR-14 */
         EvaluacionFinancieraRequest req = new EvaluacionFinancieraRequest(
                 new BigDecimal("0.015"),
                 List.of(
@@ -181,6 +207,65 @@ class OraculoYHojaControlTest {
         assertEquals(FinanzasLibrary.FIN_ERR_NO_CONVERGIO, resNoConv.tir().codigoRetornoC());
         assertEquals(50, resNoConv.tir().iteraciones());
         assertNull(resNoConv.tir().tasaInternaRetorno());
+
+        /* CR-16 (UC-67): Flujo con mas de una TIR posible [-1000, 2500, -1550] (raices ~0.137114 y ~0.361484) */
+        EvaluacionFinancieraResponse resMultiTir = finanzasEvaluacionService.evaluarProyecto(new EvaluacionFinancieraRequest(
+                new BigDecimal("0.10"),
+                List.of(new BigDecimal("-1000"), new BigDecimal("2500"), new BigDecimal("-1550")),
+                1e-9, 1000, null));
+        assertTrue(resMultiTir.tir().convergio());
+        double rMulti = resMultiTir.tir().tasaInternaRetorno().doubleValue();
+        double vpnEnRaiz = finanzasEvaluacionService.calcularVpnJava(rMulti, new double[]{-1000, 2500, -1550});
+        assertTrue(Math.abs(vpnEnRaiz) < 0.01, "La raiz encontrada debe anular el VPN: " + vpnEnRaiz);
+    }
+
+    @Test
+    @DisplayName("UC-42 (RF-12): Desembolsos en el tiempo cuadran hasta el peso con el Costo Directo Total")
+    void testDesembolsosExactos() {
+        DesembolsosRequest req = new DesembolsosRequest(3, List.of(
+                new CapituloDesembolsoInput("C1", "CAP-01", "Preliminares",
+                        new BigDecimal("100.00"), List.of(new BigDecimal("33.33"), new BigDecimal("33.33"), new BigDecimal("33.34"))),
+                new CapituloDesembolsoInput("C2", "CAP-02", "Cimentacion",
+                        new BigDecimal("250.55"), List.of(new BigDecimal("50.00"), new BigDecimal("25.00"), new BigDecimal("25.00")))
+        ));
+        DesembolsosResponse res = presupuestoCalculoService.calcularDesembolsos(req);
+        assertEquals(new BigDecimal("350.55"), res.costoDirectoTotal());
+        assertEquals(new BigDecimal("350.55"), res.totalDesembolsado());
+        assertEquals(new BigDecimal("0.00"), res.diferenciaValidacion());
+        assertEquals(new BigDecimal("350.55"), res.acumuladosPorSemana().get(2));
+        assertEquals(new BigDecimal("100.00"), res.capitulos().get(0).totalCapituloDesembolsado());
+        assertEquals(new BigDecimal("250.55"), res.capitulos().get(1).totalCapituloDesembolsado());
+
+        assertThrows(IllegalArgumentException.class, () -> presupuestoCalculoService.calcularDesembolsos(
+                new DesembolsosRequest(2, List.of(
+                        new CapituloDesembolsoInput("C1", "CAP-01", "Preliminares",
+                                new BigDecimal("100.00"), List.of(new BigDecimal("40.00"), new BigDecimal("40.00")))))));
+    }
+
+    @Test
+    @DisplayName("UC-86: Benchmark ejecuta 120 periodos y reporta tiempos Java y esquema de frontera JNA")
+    void testBenchmark() {
+        BenchmarkResponse res = finanzasEvaluacionService.ejecutarBenchmark(120, 100);
+        assertEquals(120, res.periodos());
+        assertEquals(100, res.corridas());
+        assertNotNull(res.tirResultado());
+        assertTrue(res.tiempoJavaMsExacto() >= 0.0);
+    }
+
+    @Test
+    @DisplayName("UC-66 (RQ-02): Cuarta funcion financiera TIRM sin alterar el contrato REST")
+    void testTirmSinCambioRest() {
+        BigDecimal tirm = finanzasEvaluacionService.calcularTirm(
+                List.of(
+                        new BigDecimal("-10000.00"),
+                        new BigDecimal("3500.00"),
+                        new BigDecimal("4000.00"),
+                        new BigDecimal("4500.00")
+                ),
+                new BigDecimal("0.05"),
+                new BigDecimal("0.08")
+        );
+        assertEquals(new BigDecimal("0.088655"), tirm);
     }
 
     @Test

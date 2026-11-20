@@ -5,19 +5,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/**
- * Snapshot inmutable de un presupuesto enviado a revisión (RF-10 / UC-38).
- * Todas las columnas son de solo lectura después de insertar: las versiones
- * nunca se modifican y sirven para demostrar qué se envió exactamente.
- */
 @Entity
 @Table(name = "versiones_presupuesto")
 public class VersionPresupuesto {
@@ -32,17 +27,17 @@ public class VersionPresupuesto {
     @Column(name = "presupuesto_id", nullable = false, updatable = false)
     private UUID presupuestoId;
 
-    @Column(name = "numero", nullable = false, updatable = false)
-    private Integer numero;
+    @Column(name = "numero_version", nullable = false, updatable = false)
+    private Integer numeroVersion;
 
-    @Column(name = "codigo_presupuesto", length = 40, nullable = false, updatable = false)
-    private String codigoPresupuesto;
+    @Column(name = "etiqueta", length = 120, nullable = false, updatable = false)
+    private String etiqueta;
 
-    @Column(name = "nombre_presupuesto", length = 200, nullable = false, updatable = false)
-    private String nombrePresupuesto;
+    @Column(name = "comentario_envio", length = 500, updatable = false)
+    private String comentarioEnvio;
 
-    @Column(name = "estado", length = 20, nullable = false, updatable = false)
-    private String estado = "ENVIADA";
+    @Column(name = "estado_en_momento", length = 20, nullable = false, updatable = false)
+    private String estadoEnMomento;
 
     @Column(name = "creado_por", length = 100, nullable = false, updatable = false)
     private String creadoPor;
@@ -50,18 +45,35 @@ public class VersionPresupuesto {
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private OffsetDateTime fechaCreacion;
 
-    @Column(name = "destinatario_sub", length = 100, nullable = false, updatable = false)
+    // RF-10 / UC-38: identidad congelada y datos de la notificación al revisor.
+    @Column(name = "codigo_presupuesto", length = 40, nullable = false, updatable = false)
+    private String codigoPresupuesto;
+
+    @Column(name = "nombre_presupuesto", length = 200, nullable = false, updatable = false)
+    private String nombrePresupuesto;
+
+    @Column(name = "destinatario_sub", length = 100, updatable = false)
     private String destinatarioSub;
 
-    @Column(name = "fecha_notificacion", nullable = false, updatable = false)
+    @Column(name = "fecha_notificacion", updatable = false)
     private OffsetDateTime fechaNotificacion;
 
-    @Column(name = "mensaje", length = 500, updatable = false)
-    private String mensaje;
+    @Column(name = "costo_directo", precision = 19, scale = 2, nullable = false, updatable = false)
+    private BigDecimal costoDirecto;
 
-    @Lob
-    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
-    @Column(name = "snapshot_json", nullable = false, updatable = false)
+    @Column(name = "valor_administracion", precision = 19, scale = 2, nullable = false, updatable = false)
+    private BigDecimal valorAdministracion;
+
+    @Column(name = "valor_imprevistos", precision = 19, scale = 2, nullable = false, updatable = false)
+    private BigDecimal valorImprevistos;
+
+    @Column(name = "valor_utilidad", precision = 19, scale = 2, nullable = false, updatable = false)
+    private BigDecimal valorUtilidad;
+
+    @Column(name = "precio_venta", precision = 19, scale = 2, nullable = false, updatable = false)
+    private BigDecimal precioVenta;
+
+    @Column(name = "snapshot_json", columnDefinition = "TEXT", nullable = false, updatable = false)
     private String snapshotJson;
 
     public VersionPresupuesto() {
@@ -83,36 +95,36 @@ public class VersionPresupuesto {
         this.presupuestoId = presupuestoId;
     }
 
-    public Integer getNumero() {
-        return numero;
+    public Integer getNumeroVersion() {
+        return numeroVersion;
     }
 
-    public void setNumero(Integer numero) {
-        this.numero = numero;
+    public void setNumeroVersion(Integer numeroVersion) {
+        this.numeroVersion = numeroVersion;
     }
 
-    public String getCodigoPresupuesto() {
-        return codigoPresupuesto;
+    public String getEtiqueta() {
+        return etiqueta;
     }
 
-    public void setCodigoPresupuesto(String codigoPresupuesto) {
-        this.codigoPresupuesto = codigoPresupuesto;
+    public void setEtiqueta(String etiqueta) {
+        this.etiqueta = etiqueta;
     }
 
-    public String getNombrePresupuesto() {
-        return nombrePresupuesto;
+    public String getComentarioEnvio() {
+        return comentarioEnvio;
     }
 
-    public void setNombrePresupuesto(String nombrePresupuesto) {
-        this.nombrePresupuesto = nombrePresupuesto;
+    public void setComentarioEnvio(String comentarioEnvio) {
+        this.comentarioEnvio = comentarioEnvio;
     }
 
-    public String getEstado() {
-        return estado;
+    public String getEstadoEnMomento() {
+        return estadoEnMomento;
     }
 
-    public void setEstado(String estado) {
-        this.estado = estado;
+    public void setEstadoEnMomento(String estadoEnMomento) {
+        this.estadoEnMomento = estadoEnMomento;
     }
 
     public String getCreadoPor() {
@@ -131,6 +143,22 @@ public class VersionPresupuesto {
         this.fechaCreacion = fechaCreacion;
     }
 
+    public String getCodigoPresupuesto() {
+        return codigoPresupuesto;
+    }
+
+    public void setCodigoPresupuesto(String codigoPresupuesto) {
+        this.codigoPresupuesto = codigoPresupuesto;
+    }
+
+    public String getNombrePresupuesto() {
+        return nombrePresupuesto;
+    }
+
+    public void setNombrePresupuesto(String nombrePresupuesto) {
+        this.nombrePresupuesto = nombrePresupuesto;
+    }
+
     public String getDestinatarioSub() {
         return destinatarioSub;
     }
@@ -147,12 +175,44 @@ public class VersionPresupuesto {
         this.fechaNotificacion = fechaNotificacion;
     }
 
-    public String getMensaje() {
-        return mensaje;
+    public BigDecimal getCostoDirecto() {
+        return costoDirecto;
     }
 
-    public void setMensaje(String mensaje) {
-        this.mensaje = mensaje;
+    public void setCostoDirecto(BigDecimal costoDirecto) {
+        this.costoDirecto = costoDirecto;
+    }
+
+    public BigDecimal getValorAdministracion() {
+        return valorAdministracion;
+    }
+
+    public void setValorAdministracion(BigDecimal valorAdministracion) {
+        this.valorAdministracion = valorAdministracion;
+    }
+
+    public BigDecimal getValorImprevistos() {
+        return valorImprevistos;
+    }
+
+    public void setValorImprevistos(BigDecimal valorImprevistos) {
+        this.valorImprevistos = valorImprevistos;
+    }
+
+    public BigDecimal getValorUtilidad() {
+        return valorUtilidad;
+    }
+
+    public void setValorUtilidad(BigDecimal valorUtilidad) {
+        this.valorUtilidad = valorUtilidad;
+    }
+
+    public BigDecimal getPrecioVenta() {
+        return precioVenta;
+    }
+
+    public void setPrecioVenta(BigDecimal precioVenta) {
+        this.precioVenta = precioVenta;
     }
 
     public String getSnapshotJson() {

@@ -30,6 +30,11 @@ int fin_tir(const double *flujos, int n, double tol, int max_iter,
 int fin_amortizacion(double capital, double tasa_periodo, int periodos,
                      double *cuotas_out);
 
+/* 4ta función financiera (UC-66 / RQ-02): Tasa Interna de Retorno Modificada (TIRM).
+   Devuelve 0 si se calculó correctamente, o código negativo FIN_ERR_*. */
+int fin_tirm(const double *flujos, int n, double tasa_financiamiento,
+             double tasa_reinversion, double *tirm_out);
+
 #ifdef __cplusplus
 }
 #endif

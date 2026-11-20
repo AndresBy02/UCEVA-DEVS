@@ -5,8 +5,16 @@
       @if (authService.isAuthenticated()) {
         <nav class="main-nav">
           <a routerLink="/presupuestos" routerLinkActive="active">Presupuestos</a>
+          <a routerLink="/revision" routerLinkActive="active">
+            En Revisión
+            @if (enRevisionCount() > 0) {
+              <span class="nav-pill">{{ enRevisionCount() }}</span>
+            }
+          </a>
           <a routerLink="/escenarios/comparar" routerLinkActive="active">Comparador A vs B</a>
           <a routerLink="/insumos" routerLinkActive="active">Insumos</a>
+          <a routerLink="/evaluacion-financiera" routerLinkActive="active">Evaluación VPN/TIR</a>
+          <a routerLink="/benchmark-jna" routerLinkActive="active">Benchmark JNA</a>
         </nav>
       }
     </div>

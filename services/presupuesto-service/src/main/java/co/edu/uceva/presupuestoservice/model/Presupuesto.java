@@ -71,11 +71,26 @@ public class Presupuesto {
     @Column(name = "fecha_creacion")
     private OffsetDateTime fechaCreacion;
 
+    @Column(name = "enviado_revision_por", length = 100)
+    private String enviadoRevisionPor;
+
+    @Column(name = "fecha_envio_revision")
+    private OffsetDateTime fechaEnvioRevision;
+
     @Column(name = "aprobado_por", length = 100)
     private String aprobadoPor;
 
     @Column(name = "fecha_aprobacion")
     private OffsetDateTime fechaAprobacion;
+
+    @Column(name = "motivo_rechazo", columnDefinition = "TEXT")
+    private String motivoRechazo;
+
+    @Column(name = "rechazado_por", length = 100)
+    private String rechazadoPor;
+
+    @Column(name = "fecha_rechazo")
+    private OffsetDateTime fechaRechazo;
 
     @OneToMany(mappedBy = "presupuesto", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orden ASC")
@@ -218,5 +233,45 @@ public class Presupuesto {
 
     public void setCapitulos(List<Capitulo> capitulos) {
         this.capitulos = capitulos;
+    }
+
+    public String getEnviadoRevisionPor() {
+        return enviadoRevisionPor;
+    }
+
+    public void setEnviadoRevisionPor(String enviadoRevisionPor) {
+        this.enviadoRevisionPor = enviadoRevisionPor;
+    }
+
+    public OffsetDateTime getFechaEnvioRevision() {
+        return fechaEnvioRevision;
+    }
+
+    public void setFechaEnvioRevision(OffsetDateTime fechaEnvioRevision) {
+        this.fechaEnvioRevision = fechaEnvioRevision;
+    }
+
+    public String getMotivoRechazo() {
+        return motivoRechazo;
+    }
+
+    public void setMotivoRechazo(String motivoRechazo) {
+        this.motivoRechazo = motivoRechazo;
+    }
+
+    public String getRechazadoPor() {
+        return rechazadoPor;
+    }
+
+    public void setRechazadoPor(String rechazadoPor) {
+        this.rechazadoPor = rechazadoPor;
+    }
+
+    public OffsetDateTime getFechaRechazo() {
+        return fechaRechazo;
+    }
+
+    public void setFechaRechazo(OffsetDateTime fechaRechazo) {
+        this.fechaRechazo = fechaRechazo;
     }
 }

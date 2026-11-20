@@ -6,6 +6,8 @@ import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoRequest
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoResponse.CapituloCalculado;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoResponse.ItemCalculado;
+import co.edu.uceva.presupuestoservice.dto.CalculoDtos.DesembolsosRequest;
+import co.edu.uceva.presupuestoservice.dto.CalculoDtos.DesembolsosResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.PuntoEquilibrioResult;
 import co.edu.uceva.presupuestoservice.dto.InsumoCatalogoDto;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoDetalleResponse;
@@ -396,6 +398,184 @@ class PresupuestoFlujoCompletoYHojaControlTest {
         PresupuestoDetalleResponse intacto = presupuestoService.obtenerDetalle(creado.id());
         assertThat(intacto.capitulos().get(0).items().get(0).precioUnitarioCopia())
                 .isEqualTo(new BigDecimal("100.000"));
+    }
+
+    @Test
+    @DisplayName("UC-37, UC-38, UC-39, UC-42, UC-43, UC-45: CSV, envio a revision, versiones, comparacion, rechazo con motivo y desembolsos")
+    void flujoSprint4RevisionVersionesRechazoCsvYDesembolsos() throws Exception {
+        UUID insA = UUID.randomUUID();
+        UUID insB = UUID.randomUUID();
+        UUID insC = UUID.randomUUID();
+        catalogoEnMemoria.put(insA, new InsumoCatalogoDto(
+                insA, "CEM-001", "Cemento gris, 50kg", "BULTO",
+                new BigDecimal("12.345"), true, OffsetDateTime.now(ZoneOffset.UTC)));
+        catalogoEnMemoria.put(insB, new InsumoCatalogoDto(
+                insB, "ARE-001", "Arena de rio", "M3",
+                new BigDecimal("50.000"), true, OffsetDateTime.now(ZoneOffset.UTC)));
+        catalogoEnMemoria.put(insC, new InsumoCatalogoDto(
+                insC, "ACE-001", "Acero corrugado", "KG",
+                new BigDecimal("40.000"), true, OffsetDateTime.now(ZoneOffset.UTC)));
+
+        PresupuestoDetalleResponse creado = presupuestoService.crearPresupuesto(
+                new PresupuestoRequest("PRE-S4", "Obra Sprint 4", "Cliente S4",
+                        new BigDecimal("8.00"), new BigDecimal("3.00"), new BigDecimal("5.00"),
+                        null, null, null,
+                        List.of(new CapituloInicialRequest("CAP-01", "Cimentacion",
+                                List.of(
+                                        new ItemCreateRequest(insA, new BigDecimal("10.000")),
+                                        new ItemCreateRequest(insB, new BigDecimal("2.000"))
+                                )))),
+                "sub-ana-01");
+        UUID id = creado.id();
+        UUID capId = creado.capitulos().get(0).id();
+        UUID itemAId = creado.capitulos().get(0).items().get(0).id();
+        UUID itemBId = creado.capitulos().get(0).items().get(1).id();
+
+        // UC-37: Exportacion CSV exacta con punto decimal y comillas RFC4180
+        String csv = mockMvc.perform(get("/api/v1/presupuestos/{id}/exportar-csv", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(csv).contains("\"Cemento gris, 50kg\"");
+        assertThat(csv).contains("12.345");
+        assertThat(csv).contains("SUBTOTAL_CAPITULO,,,CAP-01,Cimentacion,,,,,,223.45");
+        assertThat(csv).contains("PRECIO_VENTA,,,,,Precio de Venta Total,,,,,259.20");
+
+        // UC-42: Desembolsos en el tiempo
+        given(calculoMotorClient.calcularDesembolsos(any(DesembolsosRequest.class)))
+                .willAnswer(inv -> ejecutarDesembolsosExacto(inv.getArgument(0)));
+
+        mockMvc.perform(put("/api/v1/presupuestos/{id}/desembolsos", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"semanas\":2,\"capitulos\":[{\"capituloId\":\"" + capId + "\",\"porcentajesPorSemana\":[40,60]}]}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/presupuestos/{id}/desembolsos", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"semanas\":2,\"capitulos\":[{\"capituloId\":\"" + capId + "\",\"porcentajesPorSemana\":[40,60]}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.costoDirectoTotal").value(223.45))
+                .andExpect(jsonPath("$.totalDesembolsado").value(223.45))
+                .andExpect(jsonPath("$.diferenciaValidacion").value(0.00));
+
+        // UC-38 & UC-43: Enviar a revision congela version v1 y aparece en cola de revision
+        mockMvc.perform(post("/api/v1/presupuestos/{id}/enviar-revision", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"etiqueta\":\"Envio inicial v1\",\"comentario\":\"Listo para revision\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("EN_REVISION"))
+                .andExpect(jsonPath("$.enviadoRevisionPor").value("sub-ana-01"));
+
+        mockMvc.perform(get("/api/v1/presupuestos/en-revision")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].codigo").value("PRE-S4"));
+
+        // Mientras esta EN_REVISION no se puede editar ni siquiera por el presupuestador (409)
+        mockMvc.perform(put("/api/v1/presupuestos/{id}", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"Cambio ilegal\",\"cliente\":\"C\",\"porcentajeAdministracion\":8,\"porcentajeImprevistos\":3,\"porcentajeUtilidad\":5}"))
+                .andExpect(status().isConflict());
+
+        // UC-45: Presupuestador no puede rechazar (403); revisor no puede rechazar sin motivo (400)
+        mockMvc.perform(post("/api/v1/presupuestos/{id}/rechazar", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"Intento\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/presupuestos/{id}/rechazar", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/presupuestos/{id}/rechazar", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"Ajustar cantidad de cemento y agregar acero\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("BORRADOR"))
+                .andExpect(jsonPath("$.motivoRechazo").value("Ajustar cantidad de cemento y agregar acero"))
+                .andExpect(jsonPath("$.rechazadoPor").value("sub-carlos-02"));
+
+        // Presupuestador corrige en BORRADOR: modifica item A, elimina item B y agrega item C
+        presupuestoService.actualizarItem(id, capId, itemAId,
+                new co.edu.uceva.presupuestoservice.dto.ItemUpdateRequest(
+                        new BigDecimal("12.000"), new BigDecimal("12.345")));
+        presupuestoService.eliminarItem(id, capId, itemBId);
+        presupuestoService.agregarItem(id, capId, new ItemCreateRequest(insC, new BigDecimal("3.000")));
+
+        // Reenvio a revision congela v2 y limpia motivo de rechazo
+        mockMvc.perform(post("/api/v1/presupuestos/{id}/enviar-revision", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-presupuestador")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"etiqueta\":\"Correccion v2\",\"comentario\":\"Corregido segun observaciones\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("EN_REVISION"))
+                .andExpect(jsonPath("$.motivoRechazo").doesNotExist());
+
+        // UC-39: Listar versiones y comparar v1 vs v2
+        String versionesJson = mockMvc.perform(get("/api/v1/presupuestos/{id}/versiones", id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var versionesTree = mapper.readTree(versionesJson);
+        String v2Id = versionesTree.get(0).get("id").asText();
+        String v1Id = versionesTree.get(1).get("id").asText();
+
+        mockMvc.perform(get("/api/v1/presupuestos/{id}/versiones/comparar", id)
+                        .param("versionA", v1Id)
+                        .param("versionB", v2Id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-revisor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemsAgregados.length()").value(1))
+                .andExpect(jsonPath("$.itemsAgregados[0].codigoInsumo").value("ACE-001"))
+                .andExpect(jsonPath("$.itemsEliminados.length()").value(1))
+                .andExpect(jsonPath("$.itemsEliminados[0].codigoInsumo").value("ARE-001"))
+                .andExpect(jsonPath("$.itemsModificados.length()").value(1))
+                .andExpect(jsonPath("$.itemsModificados[0].codigoInsumo").value("CEM-001"));
+    }
+
+    private static DesembolsosResponse ejecutarDesembolsosExacto(DesembolsosRequest req) {
+        int semanas = req.semanas();
+        BigDecimal cien = new BigDecimal("100");
+        BigDecimal cero = new BigDecimal("0.00");
+        List<DesembolsosResponse.CapituloDesembolso> caps = new ArrayList<>();
+        BigDecimal[] totSem = new BigDecimal[semanas];
+        for (int i = 0; i < semanas; i++) totSem[i] = cero;
+        BigDecimal cd = cero;
+        for (var c : req.capitulos()) {
+            BigDecimal sub = c.subtotalCapitulo().setScale(2, RoundingMode.HALF_UP);
+            cd = cd.add(sub);
+            List<BigDecimal> montos = new ArrayList<>();
+            BigDecimal acum = cero;
+            for (int s = 0; s < semanas; s++) {
+                BigDecimal m = (s == semanas - 1)
+                        ? sub.subtract(acum).setScale(2, RoundingMode.HALF_UP)
+                        : sub.multiply(c.porcentajesPorSemana().get(s)).divide(cien, 2, RoundingMode.HALF_UP);
+                montos.add(m);
+                acum = acum.add(m);
+                totSem[s] = totSem[s].add(m);
+            }
+            caps.add(new DesembolsosResponse.CapituloDesembolso(
+                    c.capituloId(), c.codigo(), c.nombre(), sub, acum, c.porcentajesPorSemana(), montos));
+        }
+        List<BigDecimal> totOut = List.of(totSem);
+        List<BigDecimal> acumOut = new ArrayList<>();
+        BigDecimal run = cero;
+        for (BigDecimal t : totSem) {
+            run = run.add(t);
+            acumOut.add(run);
+        }
+        return new DesembolsosResponse(semanas, cd, run, cd.subtract(run), caps, totOut, acumOut);
     }
 
     private static CalculoPresupuestoResponse ejecutarProtocoloCalculoExacto(CalculoPresupuestoRequest req) {

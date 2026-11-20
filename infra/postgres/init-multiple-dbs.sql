@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS presupuestos (
     codigo VARCHAR(40) NOT NULL UNIQUE,
     nombre VARCHAR(200) NOT NULL,
     cliente VARCHAR(150) NOT NULL,
-    estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR' CHECK (estado IN ('BORRADOR', 'APROBADO')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR' CHECK (estado IN ('BORRADOR', 'EN_REVISION', 'APROBADO')),
     porcentaje_administracion NUMERIC(7, 4) NOT NULL DEFAULT 8.0000,
     porcentaje_imprevistos NUMERIC(7, 4) NOT NULL DEFAULT 3.0000,
     porcentaje_utilidad NUMERIC(7, 4) NOT NULL DEFAULT 5.0000,
@@ -41,8 +41,13 @@ CREATE TABLE IF NOT EXISTS presupuestos (
     presupuesto_base_id UUID REFERENCES presupuestos(id) ON DELETE SET NULL,
     creado_por VARCHAR(100) NOT NULL,
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    enviado_revision_por VARCHAR(100),
+    fecha_envio_revision TIMESTAMP WITH TIME ZONE,
     aprobado_por VARCHAR(100),
-    fecha_aprobacion TIMESTAMP WITH TIME ZONE
+    fecha_aprobacion TIMESTAMP WITH TIME ZONE,
+    motivo_rechazo TEXT,
+    rechazado_por VARCHAR(100),
+    fecha_rechazo TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS capitulos (
@@ -65,19 +70,33 @@ CREATE TABLE IF NOT EXISTS items_presupuesto (
     precio_unitario_copia NUMERIC(19, 3) NOT NULL CHECK (precio_unitario_copia >= 0)
 );
 
--- RF-10 / UC-38: snapshot inmutable de cada envío a revisión.
 CREATE TABLE IF NOT EXISTS versiones_presupuesto (
     id UUID PRIMARY KEY,
     presupuesto_id UUID NOT NULL REFERENCES presupuestos(id) ON DELETE CASCADE,
-    numero INTEGER NOT NULL,
-    codigo_presupuesto VARCHAR(40) NOT NULL,
-    nombre_presupuesto VARCHAR(200) NOT NULL,
-    estado VARCHAR(20) NOT NULL DEFAULT 'ENVIADA',
+    numero_version INTEGER NOT NULL,
+    etiqueta VARCHAR(120) NOT NULL,
+    comentario_envio VARCHAR(500),
+    estado_en_momento VARCHAR(20) NOT NULL,
     creado_por VARCHAR(100) NOT NULL,
     fecha_creacion TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    destinatario_sub VARCHAR(100) NOT NULL,
-    fecha_notificacion TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    mensaje VARCHAR(500),
+    codigo_presupuesto VARCHAR(40) NOT NULL,
+    nombre_presupuesto VARCHAR(200) NOT NULL,
+    destinatario_sub VARCHAR(100),
+    fecha_notificacion TIMESTAMP WITH TIME ZONE,
+    costo_directo NUMERIC(19, 2) NOT NULL,
+    valor_administracion NUMERIC(19, 2) NOT NULL,
+    valor_imprevistos NUMERIC(19, 2) NOT NULL,
+    valor_utilidad NUMERIC(19, 2) NOT NULL,
+    precio_venta NUMERIC(19, 2) NOT NULL,
     snapshot_json TEXT NOT NULL,
-    CONSTRAINT uk_versiones_presupuesto_numero UNIQUE (presupuesto_id, numero)
+    CONSTRAINT uq_version_presupuesto UNIQUE (presupuesto_id, numero_version)
+);
+
+CREATE TABLE IF NOT EXISTS desembolsos_capitulo (
+    id UUID PRIMARY KEY,
+    presupuesto_id UUID NOT NULL REFERENCES presupuestos(id) ON DELETE CASCADE,
+    capitulo_id UUID NOT NULL REFERENCES capitulos(id) ON DELETE CASCADE,
+    semana INTEGER NOT NULL CHECK (semana >= 1),
+    porcentaje_avance NUMERIC(7, 4) NOT NULL CHECK (porcentaje_avance >= 0 AND porcentaje_avance <= 100),
+    CONSTRAINT uq_desembolso_cap_semana UNIQUE (capitulo_id, semana)
 );
