@@ -17,6 +17,7 @@ import {
 } from '../../core/models/api.models';
 import { InsumoApiService } from '../../core/services/insumo-api.service';
 import { PresupuestoApiService } from '../../core/services/presupuesto-api.service';
+import { descargarCsvPresupuesto } from '../../core/utils/presupuesto-csv.util';
 import { extraerErrorHttp } from '../../core/utils/http-error.util';
 
 @Component({
@@ -814,7 +815,12 @@ export class PresupuestoDetalleComponent implements OnInit {
         URL.revokeObjectURL(url);
         this.successMsg.set(`Archivo presupuesto-${p.codigo}.csv descargado.`);
       },
-      error: (err) => this.errorMsg.set(extraerErrorHttp(err)),
+      error: () => {
+        // Respaldo (UC-37): si el endpoint del servidor no responde, se genera el CSV en el cliente
+        // con los valores ya calculados por el backend (sin recalcular montos en TypeScript).
+        descargarCsvPresupuesto(p);
+        this.successMsg.set('Presupuesto exportado a CSV (generado en el navegador).');
+      },
     });
   }
 
