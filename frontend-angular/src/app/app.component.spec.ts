@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { AppComponent } from './app.component';
 import { AuthService } from './core/auth/auth.service';
+import { PresupuestoApiService } from './core/services/presupuesto-api.service';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
@@ -15,10 +17,17 @@ describe('AppComponent', () => {
       login: () => {},
       logout: () => {},
     };
+    const presupuestoApiStub = {
+      listarEnRevision: () => of([]),
+    };
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [provideRouter([]), { provide: AuthService, useValue: authStub }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authStub },
+        { provide: PresupuestoApiService, useValue: presupuestoApiStub },
+      ],
     }).compileComponents();
   });
 

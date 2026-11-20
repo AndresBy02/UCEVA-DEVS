@@ -22,4 +22,7 @@ public interface FinanzasLibrary extends Library {
 
     int fin_amortizacion(double capital, double tasaPeriodo, int periodos,
                          double[] cuotasOut);
+
+    int fin_tirm(double[] flujos, int n, double tasaFinanciamiento,
+                 double tasaReinversion, DoubleByReference tirmOut);
 }

@@ -33,6 +33,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/presupuestos/*/aprobar").hasRole("revisor")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/presupuestos/*/rechazar").hasRole("revisor")
                         .requestMatchers(HttpMethod.GET, "/api/v1/presupuestos/**").hasAnyRole("presupuestador", "revisor")
                         .requestMatchers(HttpMethod.POST, "/api/v1/presupuestos/*/sensibilidad").hasAnyRole("presupuestador", "revisor")
                         .requestMatchers("/api/v1/presupuestos/**").hasRole("presupuestador")

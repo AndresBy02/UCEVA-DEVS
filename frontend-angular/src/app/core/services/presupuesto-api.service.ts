@@ -3,11 +3,16 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ComparacionEscenarios,
+  ComparacionVersiones,
+  DesembolsoConfigRequest,
+  DesembolsosResponse,
   InsumosCriticos,
   PresupuestoDetalle,
   PresupuestoResumen,
   PrevisualizacionPrecios,
   SimulacionSensibilidad,
+  VersionPresupuestoDetalle,
+  VersionPresupuestoResumen,
 } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
@@ -17,6 +22,10 @@ export class PresupuestoApiService {
 
   listar(): Observable<PresupuestoResumen[]> {
     return this.http.get<PresupuestoResumen[]>(this.baseUrl);
+  }
+
+  listarEnRevision(): Observable<PresupuestoResumen[]> {
+    return this.http.get<PresupuestoResumen[]>(`${this.baseUrl}/en-revision`);
   }
 
   crear(req: { codigo: string; nombre: string; cliente: string }): Observable<PresupuestoDetalle> {
@@ -118,5 +127,42 @@ export class PresupuestoApiService {
 
   aprobar(id: string): Observable<PresupuestoDetalle> {
     return this.http.post<PresupuestoDetalle>(`${this.baseUrl}/${id}/aprobar`, {});
+  }
+
+  enviarARevision(id: string, req?: { etiqueta?: string; comentario?: string }): Observable<PresupuestoDetalle> {
+    return this.http.post<PresupuestoDetalle>(`${this.baseUrl}/${id}/enviar-revision`, req ?? {});
+  }
+
+  rechazar(id: string, motivo: string): Observable<PresupuestoDetalle> {
+    return this.http.post<PresupuestoDetalle>(`${this.baseUrl}/${id}/rechazar`, { motivo });
+  }
+
+  crearVersion(id: string, req: { etiqueta: string; comentario?: string }): Observable<VersionPresupuestoResumen> {
+    return this.http.post<VersionPresupuestoResumen>(`${this.baseUrl}/${id}/versiones`, req);
+  }
+
+  listarVersiones(id: string): Observable<VersionPresupuestoResumen[]> {
+    return this.http.get<VersionPresupuestoResumen[]>(`${this.baseUrl}/${id}/versiones`);
+  }
+
+  obtenerVersion(id: string, versionId: string): Observable<VersionPresupuestoDetalle> {
+    return this.http.get<VersionPresupuestoDetalle>(`${this.baseUrl}/${id}/versiones/${versionId}`);
+  }
+
+  compararVersiones(id: string, versionA: string, versionB: string): Observable<ComparacionVersiones> {
+    const params = new HttpParams().set('versionA', versionA).set('versionB', versionB);
+    return this.http.get<ComparacionVersiones>(`${this.baseUrl}/${id}/versiones/comparar`, { params });
+  }
+
+  exportarCsv(id: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/${id}/exportar-csv`, { responseType: 'blob' });
+  }
+
+  obtenerDesembolsos(id: string): Observable<DesembolsosResponse> {
+    return this.http.get<DesembolsosResponse>(`${this.baseUrl}/${id}/desembolsos`);
+  }
+
+  guardarDesembolsos(id: string, req: DesembolsoConfigRequest): Observable<DesembolsosResponse> {
+    return this.http.put<DesembolsosResponse>(`${this.baseUrl}/${id}/desembolsos`, req);
   }
 }

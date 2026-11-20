@@ -66,12 +66,17 @@ export interface PresupuestoDetalle {
   codigo: string;
   nombre: string;
   cliente: string;
-  estado: 'BORRADOR' | 'APROBADO';
+  estado: 'BORRADOR' | 'EN_REVISION' | 'APROBADO';
   presupuestoBaseId: string | null;
   creadoPor: string;
   fechaCreacion: string;
+  enviadoRevisionPor: string | null;
+  fechaEnvioRevision: string | null;
   aprobadoPor: string | null;
   fechaAprobacion: string | null;
+  motivoRechazo: string | null;
+  rechazadoPor: string | null;
+  fechaRechazo: string | null;
   porcentajeAdministracion: number;
   porcentajeImprevistos: number;
   porcentajeUtilidad: number;
@@ -96,15 +101,20 @@ export interface PresupuestoResumen {
   codigo: string;
   nombre: string;
   cliente: string;
-  estado: 'BORRADOR' | 'APROBADO';
+  estado: 'BORRADOR' | 'EN_REVISION' | 'APROBADO';
   presupuestoBaseId: string | null;
   porcentajeAdministracion: number;
   porcentajeImprevistos: number;
   porcentajeUtilidad: number;
   creadoPor: string;
   fechaCreacion: string;
+  enviadoRevisionPor: string | null;
+  fechaEnvioRevision: string | null;
   aprobadoPor: string | null;
   fechaAprobacion: string | null;
+  motivoRechazo: string | null;
+  rechazadoPor: string | null;
+  fechaRechazo: string | null;
   totalCapitulos: number;
   totalItems: number;
 }
@@ -195,4 +205,159 @@ export interface InsumosCriticos {
     impactoCostoDirecto: number;
     impactoPrecioVenta: number;
   }>;
+}
+
+export interface VersionPresupuestoResumen {
+  id: string;
+  presupuestoId: string;
+  numeroVersion: number;
+  etiqueta: string;
+  comentarioEnvio: string | null;
+  estadoEnMomento: string;
+  creadoPor: string;
+  fechaCreacion: string;
+  costoDirecto: number;
+  valorAdministracion: number;
+  valorImprevistos: number;
+  valorUtilidad: number;
+  precioVenta: number;
+}
+
+export interface VersionPresupuestoDetalle extends VersionPresupuestoResumen {
+  snapshot: PresupuestoDetalle;
+}
+
+export interface ItemVersionCambio {
+  itemId: string;
+  capituloCodigo: string;
+  capituloNombre: string;
+  codigoInsumo: string;
+  descripcion: string;
+  unidadMedida: string;
+  cantidad: string;
+  precioUnitarioCopia: string;
+  valorParcial: number;
+}
+
+export interface ItemVersionModificado {
+  itemId: string;
+  capituloCodigo: string;
+  capituloNombre: string;
+  codigoInsumo: string;
+  descripcion: string;
+  unidadMedida: string;
+  cantidadAntes: string;
+  cantidadDespues: string;
+  precioAntes: string;
+  precioDespues: string;
+  valorParcialAntes: number;
+  valorParcialDespues: number;
+  diferenciaParcial: number;
+}
+
+export interface ComparacionVersiones {
+  presupuestoId: string;
+  versionA: VersionPresupuestoResumen;
+  versionB: VersionPresupuestoResumen;
+  diferenciaCostoDirecto: number;
+  diferenciaPrecioVenta: number;
+  itemsAgregados: ItemVersionCambio[];
+  itemsEliminados: ItemVersionCambio[];
+  itemsModificados: ItemVersionModificado[];
+}
+
+export interface CapituloDesembolso {
+  capituloId: string;
+  codigo: string;
+  nombre: string;
+  subtotalCapitulo: number;
+  totalCapituloDesembolsado: number;
+  porcentajesPorSemana: number[];
+  montosPorSemana: number[];
+}
+
+export interface DesembolsosResponse {
+  semanas: number;
+  costoDirectoTotal: number;
+  totalDesembolsado: number;
+  diferenciaValidacion: number;
+  capitulos: CapituloDesembolso[];
+  totalesPorSemana: number[];
+  acumuladosPorSemana: number[];
+}
+
+export interface DesembolsoConfigRequest {
+  semanas: number;
+  capitulos: Array<{
+    capituloId: string;
+    porcentajesPorSemana: number[];
+  }>;
+}
+
+export interface EvaluacionFinancieraRequest {
+  tasaDescuento: number;
+  flujosCaja: number[];
+  toleranciaTir: number;
+  maxIteracionesTir: number;
+  financiacion: {
+    capital: number;
+    tasaPeriodo: number;
+    periodos: number;
+  } | null;
+}
+
+export interface FilaAmortizacion {
+  periodo: number;
+  cuota: number;
+  interes: number;
+  abonoCapital: number;
+  saldo: number;
+}
+
+export interface EvaluacionFinancieraResponse {
+  motorUtilizado: string;
+  vpn: number | null;
+  tir: {
+    convergio: boolean;
+    estado: string;
+    codigoRetornoC: number;
+    tasaInternaRetorno: number | null;
+    tasaInternaRetornoPorcentaje: number | null;
+    iteraciones: number;
+    mensaje: string;
+  };
+  amortizacion: {
+    capital: number;
+    tasaPeriodo: number;
+    periodos: number;
+    cuotaFija: number;
+    filas: FilaAmortizacion[];
+  } | null;
+}
+
+export interface SpikeJnaResponse {
+  bibliotecaCargada: boolean;
+  nombreBiblioteca: string;
+  operandoA: number;
+  operandoB: number;
+  resultadoNativoC: number;
+  arquitecturaContenedor: string;
+  mensaje: string;
+}
+
+export interface BenchmarkResponse {
+  periodos: number;
+  corridas: number;
+  motorActivo: string;
+  tiempoJavaMs: number;
+  tiempoNativoMs: number | null;
+  tiempoNativoPorIteracionMs: number | null;
+  tiempoJavaMsExacto: number;
+  tiempoNativoMsExacto: number | null;
+  tiempoNativoPorIteracionMsExacto: number | null;
+  totalLlamadasJnaPorCorrida: number;
+  totalLlamadasJnaPorIteracion: number;
+  factorSobrecostoJna: number | null;
+  tirResultado: number | null;
+  iteracionesPorCorrida: number;
 }

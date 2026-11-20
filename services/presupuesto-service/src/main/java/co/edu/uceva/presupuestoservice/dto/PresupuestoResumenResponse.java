@@ -18,8 +18,13 @@ public record PresupuestoResumenResponse(
         BigDecimal porcentajeUtilidad,
         String creadoPor,
         OffsetDateTime fechaCreacion,
+        String enviadoRevisionPor,
+        OffsetDateTime fechaEnvioRevision,
         String aprobadoPor,
         OffsetDateTime fechaAprobacion,
+        String motivoRechazo,
+        String rechazadoPor,
+        OffsetDateTime fechaRechazo,
         int totalCapitulos,
         int totalItems
 ) {

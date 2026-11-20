@@ -3,6 +3,8 @@ package co.edu.uceva.calculoservice.controller;
 import co.edu.uceva.calculoservice.dto.BenchmarkResponse;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoRequest;
 import co.edu.uceva.calculoservice.dto.CalculoPresupuestoResponse;
+import co.edu.uceva.calculoservice.dto.DesembolsosRequest;
+import co.edu.uceva.calculoservice.dto.DesembolsosResponse;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraRequest;
 import co.edu.uceva.calculoservice.dto.EvaluacionFinancieraResponse;
 import co.edu.uceva.calculoservice.dto.InsumosCriticosRequest;
@@ -77,5 +79,12 @@ public class CalculoController {
             @RequestParam(defaultValue = "1000") int corridas
     ) {
         return ResponseEntity.ok(finanzasEvaluacionService.ejecutarBenchmark(periodos, corridas));
+    }
+
+    @PostMapping("/desembolsos")
+    public ResponseEntity<DesembolsosResponse> calcularDesembolsos(
+            @RequestBody DesembolsosRequest request
+    ) {
+        return ResponseEntity.ok(presupuestoCalculoService.calcularDesembolsos(request));
     }
 }

@@ -1,7 +1,9 @@
 package co.edu.uceva.presupuestoservice.api;
 
 import co.edu.uceva.presupuestoservice.domain.CodigoDuplicadoException;
+import co.edu.uceva.presupuestoservice.domain.EstadoPresupuestoInvalidoException;
 import co.edu.uceva.presupuestoservice.domain.PresupuestoAprobadoException;
+import co.edu.uceva.presupuestoservice.domain.PresupuestoNoEditableException;
 import co.edu.uceva.presupuestoservice.domain.RecursoNoEncontradoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +40,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PresupuestoAprobadoException.class)
     public ProblemDetail manejarPresupuestoAprobado(PresupuestoAprobadoException ex) {
         return problema(HttpStatus.FORBIDDEN, "Presupuesto aprobado", ex.getMessage());
+    }
+
+    @ExceptionHandler({PresupuestoNoEditableException.class, EstadoPresupuestoInvalidoException.class})
+    public ProblemDetail manejarEstadoNoEditable(RuntimeException ex) {
+        return problema(HttpStatus.CONFLICT, "Estado de presupuesto incompatible", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail manejarArgumentoInvalido(IllegalArgumentException ex) {
+        return problema(HttpStatus.BAD_REQUEST, "Solicitud inválida", ex.getMessage());
     }
 
     @ExceptionHandler(RecursoNoEncontradoException.class)

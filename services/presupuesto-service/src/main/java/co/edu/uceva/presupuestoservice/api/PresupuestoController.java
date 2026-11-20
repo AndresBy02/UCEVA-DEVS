@@ -1,10 +1,15 @@
 package co.edu.uceva.presupuestoservice.api;
 
+import co.edu.uceva.presupuestoservice.dto.CalculoDtos.DesembolsosResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.InsumosCriticosResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.SimulacionSensibilidadResponse;
 import co.edu.uceva.presupuestoservice.dto.CapituloCreateRequest;
 import co.edu.uceva.presupuestoservice.dto.ComparacionEscenariosResponse;
+import co.edu.uceva.presupuestoservice.dto.ComparacionVersionesResponse;
+import co.edu.uceva.presupuestoservice.dto.CrearVersionRequest;
+import co.edu.uceva.presupuestoservice.dto.DesembolsoConfigRequest;
 import co.edu.uceva.presupuestoservice.dto.DuplicarEscenarioRequest;
+import co.edu.uceva.presupuestoservice.dto.EnviarRevisionRequest;
 import co.edu.uceva.presupuestoservice.dto.ItemCreateRequest;
 import co.edu.uceva.presupuestoservice.dto.ItemUpdateRequest;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoDetalleResponse;
@@ -12,9 +17,15 @@ import co.edu.uceva.presupuestoservice.dto.PresupuestoRequest;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoResumenResponse;
 import co.edu.uceva.presupuestoservice.dto.PresupuestoUpdateRequest;
 import co.edu.uceva.presupuestoservice.dto.PrevisualizacionPreciosResponse;
+import co.edu.uceva.presupuestoservice.dto.RechazarPresupuestoRequest;
 import co.edu.uceva.presupuestoservice.dto.SensibilidadRequest;
+import co.edu.uceva.presupuestoservice.dto.VersionPresupuestoDetalleResponse;
+import co.edu.uceva.presupuestoservice.dto.VersionPresupuestoResumenResponse;
 import co.edu.uceva.presupuestoservice.service.PresupuestoService;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -30,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,6 +66,11 @@ public class PresupuestoController {
     @GetMapping
     public ResponseEntity<List<PresupuestoResumenResponse>> listar() {
         return ResponseEntity.ok(presupuestoService.listarPresupuestos());
+    }
+
+    @GetMapping("/en-revision")
+    public ResponseEntity<List<PresupuestoResumenResponse>> listarEnRevision() {
+        return ResponseEntity.ok(presupuestoService.listarEnRevision());
     }
 
     @GetMapping("/por-insumo/{insumoId}")
@@ -166,6 +183,77 @@ public class PresupuestoController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(presupuestoService.aprobarPresupuesto(id, extraerSub(jwt)));
+    }
+
+    @PostMapping("/{id}/enviar-revision")
+    public ResponseEntity<PresupuestoDetalleResponse> enviarARevision(
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) EnviarRevisionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(presupuestoService.enviarARevision(id, request, extraerSub(jwt)));
+    }
+
+    @PostMapping("/{id}/rechazar")
+    public ResponseEntity<PresupuestoDetalleResponse> rechazar(
+            @PathVariable UUID id,
+            @Valid @RequestBody RechazarPresupuestoRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(presupuestoService.rechazarPresupuesto(id, request.motivo(), extraerSub(jwt)));
+    }
+
+    @PostMapping("/{id}/versiones")
+    public ResponseEntity<VersionPresupuestoResumenResponse> crearVersion(
+            @PathVariable UUID id,
+            @Valid @RequestBody CrearVersionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        VersionPresupuestoResumenResponse creada = presupuestoService.crearVersion(id, request, extraerSub(jwt));
+        return ResponseEntity.created(URI.create("/api/v1/presupuestos/" + id + "/versiones/" + creada.id()))
+                .body(creada);
+    }
+
+    @GetMapping("/{id}/versiones")
+    public ResponseEntity<List<VersionPresupuestoResumenResponse>> listarVersiones(@PathVariable UUID id) {
+        return ResponseEntity.ok(presupuestoService.listarVersiones(id));
+    }
+
+    @GetMapping("/{id}/versiones/{versionId}")
+    public ResponseEntity<VersionPresupuestoDetalleResponse> obtenerVersion(
+            @PathVariable UUID id,
+            @PathVariable UUID versionId) {
+        return ResponseEntity.ok(presupuestoService.obtenerVersion(id, versionId));
+    }
+
+    @GetMapping("/{id}/versiones/comparar")
+    public ResponseEntity<ComparacionVersionesResponse> compararVersiones(
+            @PathVariable UUID id,
+            @RequestParam UUID versionA,
+            @RequestParam UUID versionB) {
+        return ResponseEntity.ok(presupuestoService.compararVersiones(id, versionA, versionB));
+    }
+
+    @GetMapping("/{id}/exportar-csv")
+    public ResponseEntity<byte[]> exportarCsv(@PathVariable UUID id) {
+        PresupuestoDetalleResponse detalle = presupuestoService.obtenerDetalle(id);
+        String csv = presupuestoService.exportarCsv(id);
+        String safeCode = detalle.codigo().replaceAll("[^a-zA-Z0-9._-]", "_");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename("presupuesto-" + safeCode + ".csv", StandardCharsets.UTF_8)
+                .build());
+        return ResponseEntity.ok().headers(headers).body(csv.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @GetMapping("/{id}/desembolsos")
+    public ResponseEntity<DesembolsosResponse> obtenerDesembolsos(@PathVariable UUID id) {
+        return ResponseEntity.ok(presupuestoService.obtenerDesembolsos(id));
+    }
+
+    @PutMapping("/{id}/desembolsos")
+    public ResponseEntity<DesembolsosResponse> guardarDesembolsos(
+            @PathVariable UUID id,
+            @Valid @RequestBody DesembolsoConfigRequest request) {
+        return ResponseEntity.ok(presupuestoService.guardarDesembolsos(id, request));
     }
 
     private static String extraerSub(Jwt jwt) {

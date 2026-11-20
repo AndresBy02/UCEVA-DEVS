@@ -67,9 +67,12 @@ import { extraerErrorHttp } from '../../core/utils/http-error.util';
                 <td>{{ p.nombre }}</td>
                 <td>{{ p.cliente }}</td>
                 <td>
-                  <span [class]="p.estado === 'APROBADO' ? 'badge-approved' : 'badge-draft'">
+                  <span [class]="p.estado === 'APROBADO' ? 'badge-approved' : (p.estado === 'EN_REVISION' ? 'badge-review' : 'badge-draft')">
                     {{ p.estado }}
                   </span>
+                  @if (p.motivoRechazo) {
+                    <div><small style="color: var(--error-text);">Rechazado: {{ p.motivoRechazo }}</small></div>
+                  }
                 </td>
                 <td>{{ p.totalCapitulos }} / {{ p.totalItems }}</td>
                 <td><small>{{ p.creadoPor }}</small></td>

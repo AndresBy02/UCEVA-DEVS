@@ -2,6 +2,8 @@ package co.edu.uceva.presupuestoservice.client;
 
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoRequest;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.CalculoPresupuestoResponse;
+import co.edu.uceva.presupuestoservice.dto.CalculoDtos.DesembolsosRequest;
+import co.edu.uceva.presupuestoservice.dto.CalculoDtos.DesembolsosResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.InsumosCriticosRequest;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.InsumosCriticosResponse;
 import co.edu.uceva.presupuestoservice.dto.CalculoDtos.SimulacionSensibilidadRequest;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -35,6 +38,14 @@ public class CalculoMotorClient {
 
     public InsumosCriticosResponse identificarInsumosCriticos(InsumosCriticosRequest request) {
         return postJson("/api/v1/calculos/insumos-criticos", request, InsumosCriticosResponse.class);
+    }
+
+    public DesembolsosResponse calcularDesembolsos(DesembolsosRequest request) {
+        try {
+            return postJson("/api/v1/calculos/desembolsos", request, DesembolsosResponse.class);
+        } catch (HttpClientErrorException.BadRequest ex) {
+            throw new IllegalArgumentException(ex.getResponseBodyAsString());
+        }
     }
 
     private <T> T postJson(String uri, Object body, Class<T> responseType) {

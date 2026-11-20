@@ -162,7 +162,7 @@ public class FinanzasEvaluacionService {
                 }
                 factor *= base;
             }
-            if (Math.abs(f) <= tol) {
+            if (iter == 1 && Math.abs(f) <= tol) {
                 return construirTirResult(FinanzasLibrary.FIN_OK, r, iter);
             }
             if (Math.abs(df) < 1e-14 || Double.isNaN(f) || Double.isInfinite(f)) {
@@ -172,7 +172,11 @@ public class FinanzasEvaluacionService {
             if (rNext <= -0.9999) rNext = -0.99;
             else if (rNext > 100.0) rNext = 10.0;
 
-            if (Math.abs(rNext - r) <= tol * 0.1) {
+            double paso = Math.abs(rNext - r);
+            if (Math.abs(f) <= tol && paso <= Math.max(tol, 1e-9)) {
+                return construirTirResult(FinanzasLibrary.FIN_OK, rNext, iter);
+            }
+            if (paso <= tol * 0.1) {
                 double fCheck = calcularVpnJava(rNext, flujos);
                 if (Math.abs(fCheck) <= tol) {
                     return construirTirResult(FinanzasLibrary.FIN_OK, rNext, iter);
@@ -181,8 +185,8 @@ public class FinanzasEvaluacionService {
             r = rNext;
         }
 
-        double low = -0.90;
-        double high = 5.0;
+        double low = -0.95;
+        double high = 10.0;
         double fLow = calcularVpnJava(low, flujos);
         double fHigh = calcularVpnJava(high, flujos);
         if (fLow * fHigh < 0.0) {
@@ -190,7 +194,7 @@ public class FinanzasEvaluacionService {
                 iter++;
                 double mid = 0.5 * (low + high);
                 double fMid = calcularVpnJava(mid, flujos);
-                if (Math.abs(fMid) <= tol) {
+                if (Math.abs(fMid) <= tol && (high - low) * 0.5 <= Math.max(tol, 1e-7)) {
                     return construirTirResult(FinanzasLibrary.FIN_OK, mid, iter);
                 }
                 if (fLow * fMid < 0.0) {
@@ -325,22 +329,61 @@ public class FinanzasEvaluacionService {
             flujos[i] = 1500.0;
         }
 
+        // Calentamiento ligero de JVM para evitar sesgo de compilación JIT en frío
+        for (int w = 0; w < 20; w++) {
+            calcularTirJava(flujos, 1e-9, 1000);
+        }
+
         long inicioJava = System.nanoTime();
         TirResult ultimaJava = null;
         for (int i = 0; i < totalCorridas; i++) {
             ultimaJava = calcularTirJava(flujos, 1e-9, 1000);
         }
-        long finJavaMs = (System.nanoTime() - inicioJava) / 1_000_000L;
+        long duracionJavaNs = System.nanoTime() - inicioJava;
+        long finJavaMs = duracionJavaNs / 1_000_000L;
+        double finJavaMsExacto = redondearMs(duracionJavaNs);
 
         FinanzasLibrary lib = obtenerBibliotecaNativa();
         Long finNativoMs = null;
+        Double finNativoMsExacto = null;
+        Long finNativoPorIteracionMs = null;
+        Double finNativoPorIteracionMsExacto = null;
+        long llamadasPorCorrida = 0L;
+        long llamadasPorIteracion = 0L;
+        Double factorSobrecostoJna = null;
+
         TirResult ultima = ultimaJava;
         if (lib != null && !"JAVA".equalsIgnoreCase(modoConfigurado)) {
+            // Calentamiento nativo
+            for (int w = 0; w < 10; w++) {
+                calcularTirNativo(flujos, 1e-9, 1000);
+                calcularTirJnaPorIteracion(lib, flujos, 1e-9, 1000);
+            }
+
+            // 1. Cruce de frontera JNA 1 vez por corrida (calculo completo en C)
             long inicioNat = System.nanoTime();
             for (int i = 0; i < totalCorridas; i++) {
                 ultima = calcularTirNativo(flujos, 1e-9, 1000);
             }
-            finNativoMs = (System.nanoTime() - inicioNat) / 1_000_000L;
+            long duracionNatNs = System.nanoTime() - inicioNat;
+            finNativoMs = duracionNatNs / 1_000_000L;
+            finNativoMsExacto = redondearMs(duracionNatNs);
+            llamadasPorCorrida = totalCorridas;
+
+            // 2. Cruce de frontera JNA 1 vez por iteración (invocando fin_vpn en cada paso)
+            long inicioIter = System.nanoTime();
+            long totalLlamadasIter = 0L;
+            for (int i = 0; i < totalCorridas; i++) {
+                totalLlamadasIter += calcularTirJnaPorIteracion(lib, flujos, 1e-9, 1000);
+            }
+            long duracionIterNs = System.nanoTime() - inicioIter;
+            finNativoPorIteracionMs = duracionIterNs / 1_000_000L;
+            finNativoPorIteracionMsExacto = redondearMs(duracionIterNs);
+            llamadasPorIteracion = totalLlamadasIter;
+
+            if (duracionNatNs > 0) {
+                factorSobrecostoJna = Math.round(((double) duracionIterNs / (double) duracionNatNs) * 100.0) / 100.0;
+            }
         }
 
         return new BenchmarkResponse(
@@ -349,8 +392,138 @@ public class FinanzasEvaluacionService {
                 finNativoMs != null ? "NATIVE_C_LIBFINANZAS" : "JAVA_BASELINE_FALLBACK",
                 finJavaMs,
                 finNativoMs,
+                finNativoPorIteracionMs,
+                finJavaMsExacto,
+                finNativoMsExacto,
+                finNativoPorIteracionMsExacto,
+                llamadasPorCorrida,
+                llamadasPorIteracion,
+                factorSobrecostoJna,
                 ultima != null ? ultima.tasaInternaRetorno() : null,
                 ultima != null ? ultima.iteraciones() : 0
         );
+    }
+
+    private long calcularTirJnaPorIteracion(FinanzasLibrary lib, double[] flujos, double tol, int maxIter) {
+        long llamadas = 0L;
+        double r0 = 0.10;
+        double f0 = lib.fin_vpn(r0, flujos, flujos.length);
+        llamadas++;
+        if (Math.abs(f0) <= tol) {
+            return llamadas;
+        }
+
+        double r1 = 0.05;
+        double f1 = lib.fin_vpn(r1, flujos, flujos.length);
+        llamadas++;
+        if (Math.abs(f1) <= tol) {
+            return llamadas;
+        }
+
+        int iter = 2;
+        while (iter < maxIter) {
+            double denom = f1 - f0;
+            if (Math.abs(denom) < 1e-16 || Double.isNaN(denom) || Double.isInfinite(denom)) {
+                break;
+            }
+            double rNext = r1 - f1 * ((r1 - r0) / denom);
+            if (rNext <= -0.99) rNext = -0.95;
+            else if (rNext > 10.0) rNext = 5.0;
+
+            double fNext = lib.fin_vpn(rNext, flujos, flujos.length);
+            llamadas++;
+            iter++;
+            if (Math.abs(fNext) <= tol) {
+                return llamadas;
+            }
+            r0 = r1;
+            f0 = f1;
+            r1 = rNext;
+            f1 = fNext;
+        }
+
+        double low = -0.90;
+        double high = 5.0;
+        double fLow = lib.fin_vpn(low, flujos, flujos.length);
+        double fHigh = lib.fin_vpn(high, flujos, flujos.length);
+        llamadas += 2;
+        if (fLow * fHigh < 0.0) {
+            while (iter < maxIter) {
+                iter++;
+                double mid = 0.5 * (low + high);
+                double fMid = lib.fin_vpn(mid, flujos, flujos.length);
+                llamadas++;
+                if (Math.abs(fMid) <= tol) {
+                    return llamadas;
+                }
+                if (fLow * fMid < 0.0) {
+                    high = mid;
+                    fHigh = fMid;
+                } else {
+                    low = mid;
+                    fLow = fMid;
+                }
+            }
+        }
+        return llamadas;
+    }
+
+    private static double redondearMs(long nanos) {
+        return Math.round((nanos / 1_000_000.0) * 1000.0) / 1000.0;
+    }
+
+    /**
+     * 4ta función financiera (UC-66 / RQ-02): Tasa Interna de Retorno Modificada (TIRM),
+     * encapsulada en el adaptador nativo/Java sin alterar el contrato REST publicado.
+     */
+    public BigDecimal calcularTirm(List<BigDecimal> flujosBd, BigDecimal tasaFinanciamiento, BigDecimal tasaReinversion) {
+        if (flujosBd == null || flujosBd.size() < 2) {
+            throw new IllegalArgumentException("Se requieren al menos 2 flujos de caja para TIRM.");
+        }
+        double[] flujos = new double[flujosBd.size()];
+        for (int i = 0; i < flujosBd.size(); i++) {
+            flujos[i] = flujosBd.get(i).doubleValue();
+        }
+        double rf = tasaFinanciamiento != null ? tasaFinanciamiento.doubleValue() : 0.0;
+        double rr = tasaReinversion != null ? tasaReinversion.doubleValue() : 0.0;
+
+        if (debeUsarNativo()) {
+            DoubleByReference tirmOut = new DoubleByReference(0.0);
+            int rc = obtenerBibliotecaNativa().fin_tirm(flujos, flujos.length, rf, rr, tirmOut);
+            if (rc != FinanzasLibrary.FIN_OK) {
+                throw new IllegalArgumentException("No fue posible calcular TIRM nativa (codigo C: " + rc + ")");
+            }
+            return BigDecimal.valueOf(tirmOut.getValue()).setScale(6, RoundingMode.HALF_UP);
+        }
+
+        double tirmJava = calcularTirmJava(flujos, rf, rr);
+        return BigDecimal.valueOf(tirmJava).setScale(6, RoundingMode.HALF_UP);
+    }
+
+    public double calcularTirmJava(double[] flujos, double tasaFinanciamiento, double tasaReinversion) {
+        if (flujos == null || flujos.length < 2) {
+            throw new IllegalArgumentException("Dimension invalida para TIRM");
+        }
+        if (tasaFinanciamiento <= -1.0 || tasaReinversion <= -1.0) {
+            throw new IllegalArgumentException("Tasas invalidas para TIRM");
+        }
+        double vpEgresos = 0.0;
+        double vfIngresos = 0.0;
+        boolean tienePos = false;
+        boolean tieneNeg = false;
+        int n = flujos.length;
+        for (int t = 0; t < n; t++) {
+            if (flujos[t] < 0.0) {
+                tieneNeg = true;
+                vpEgresos += (-flujos[t]) / Math.pow(1.0 + tasaFinanciamiento, t);
+            } else if (flujos[t] > 0.0) {
+                tienePos = true;
+                vfIngresos += flujos[t] * Math.pow(1.0 + tasaReinversion, n - 1 - t);
+            }
+        }
+        if (!tienePos || !tieneNeg || vpEgresos <= 0.0 || vfIngresos <= 0.0) {
+            throw new IllegalArgumentException("El flujo de caja requiere egresos e ingresos para calcular TIRM");
+        }
+        return Math.pow(vfIngresos / vpEgresos, 1.0 / (n - 1)) - 1.0;
     }
 }
